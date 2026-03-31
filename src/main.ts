@@ -104,10 +104,11 @@ function distance(from: number, to: number): number {
     const n = alive.length,
         d = Math.abs(fi - ti);
     const base = Math.min(d, n - d);
-    return (
+    return Math.max(
+        1, // ← never below 1, adjacent is always adjacent
         base +
-        (G.players[to].inPlay.includes('mustang') ? 1 : 0) -
-        (G.players[from].inPlay.includes('scope') ? 1 : 0)
+            (G.players[to].inPlay.includes('mustang') ? 1 : 0) -
+            (G.players[from].inPlay.includes('scope') ? 1 : 0),
     );
 }
 
@@ -277,7 +278,9 @@ async function resolveGeneralStore() {
     const alivePlayers = G.players.filter((p) => p.alive);
     G.generalStoreCards = dealN(G.deck, alivePlayers.length);
     G.generalStorePicking = true;
-    addLog(`General Store: ${G.generalStoreCards.length} cards flipped face-up.`);
+    addLog(
+        `General Store: ${G.generalStoreCards.length} cards flipped face-up.`,
+    );
     await showBanner(`General Store! Pick a card. 🏪`, 900);
 
     // determine pick order starting from current turn
@@ -306,7 +309,10 @@ async function resolveGeneralStore() {
         } else {
             // AI picks: take the first BANG! if available, else first card
             const pick = G.generalStoreCards.includes('bang')
-                ? G.generalStoreCards.splice(G.generalStoreCards.indexOf('bang'), 1)[0]
+                ? G.generalStoreCards.splice(
+                      G.generalStoreCards.indexOf('bang'),
+                      1,
+                  )[0]
                 : G.generalStoreCards.splice(0, 1)[0];
 
             p.hand.push(pick);
@@ -1579,7 +1585,7 @@ function renderDeckSlot() {
 function renderPlayerSlot(p: Player, human: Player) {
     let canTargetAllPlayers = false;
 
-    if (G.selectedCard) {
+    if (G.selectedCard !== null) {
         const selectedCard = human.hand[G.selectedCard];
         canTargetAllPlayers = ['catbalou', 'duel'].includes(selectedCard);
     }
@@ -1594,7 +1600,7 @@ function renderPlayerSlot(p: Player, human: Player) {
     const showRole = p.role === 'sheriff' || !p.alive || p.isHuman;
     const roleLabel = showRole ? p.role : 'unknown';
     const flash = flashMap[p.id] || '';
-    const dist = p.id <= 0 ? 0 : distance(0, p.id);
+    const dist = p.isHuman ? 0 : distance(0, p.id);
     const pips = Array(p.maxHp)
         .fill(0)
         .map(
@@ -1611,7 +1617,7 @@ function renderPlayerSlot(p: Player, human: Player) {
         <span class="badge badge-${roleLabel}">${roleLabel}</span>
         ${isCur ? '<span style="font-size:10px;color:#378ADD;">◀</span>' : ''}
         ${isClickTarget ? '<span style="font-size:11px;color:#E24B4A;">🎯</span>' : ''}
-        ${!p.isHuman && p.alive ? `<span class="badge ${dist <= 1 ? 'badge-in-range' : 'badge-out-range'}">${dist <= 1 ? 'in range' : 'dist ' + dist}</span>` : ''}
+        ${!p.isHuman && p.alive ? `<span class="badge ${dist === 1 ? 'badge-in-range' : 'badge-out-range'}">${dist === 1 ? 'in range' : 'dist ' + dist}</span>` : ''}
       </div>
       <div style="margin-top:3px;">${pips}</div>
       <div style="font-size:11px;color:var(--color-text-secondary);margin-top:1px;">${p.hp}/${p.maxHp} HP · ${p.hand.length} cards</div>
