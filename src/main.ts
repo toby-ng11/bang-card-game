@@ -275,8 +275,9 @@ async function resolveDuel(challengerId: number, targetId: number) {
 
 async function resolveGeneralStore() {
     const alivePlayers = G.players.filter((p) => p.alive);
-    const flipped = dealN(G.deck, alivePlayers.length);
-    addLog(`General Store: ${flipped.length} cards flipped face-up.`);
+    G.generalStoreCards = dealN(G.deck, alivePlayers.length);
+    G.generalStorePicking = true;
+    addLog(`General Store: ${G.generalStoreCards.length} cards flipped face-up.`);
     await showBanner(`General Store! Pick a card. 🏪`, 900);
 
     // determine pick order starting from current turn
@@ -288,17 +289,15 @@ async function resolveGeneralStore() {
     }
 
     for (const p of pickOrder) {
-        if (!flipped.length) break;
+        if (!G.generalStoreCards.length) break;
 
-        G.generalStorePicking = true;
-        G.generalStoreCards = flipped;
         render();
 
         if (p.isHuman) {
             // let human pick — store flipped in G and render a picker
             G.generalStorePlayerPicking = true;
             // wait until human picks
-            await new Promise((res) => {
+            await new Promise<CardKey>((res) => {
                 G.generalStoreResolve = res;
             });
             G.generalStorePlayerPicking = false;
@@ -306,9 +305,10 @@ async function resolveGeneralStore() {
             await wait(400);
         } else {
             // AI picks: take the first BANG! if available, else first card
-            const pick = flipped.includes('bang')
-                ? flipped.splice(flipped.indexOf('bang'), 1)[0]
-                : flipped.splice(0, 1)[0];
+            const pick = G.generalStoreCards.includes('bang')
+                ? G.generalStoreCards.splice(G.generalStoreCards.indexOf('bang'), 1)[0]
+                : G.generalStoreCards.splice(0, 1)[0];
+
             p.hand.push(pick);
             debugCardCount();
             addLog(
@@ -328,7 +328,7 @@ async function resolveGeneralStore() {
     }
     G.generalStorePicking = false;
     // any remaining cards go to discard (shouldn't happen but safety net)
-    G.discardPile.push(...flipped);
+    G.discardPile.push(...G.generalStoreCards);
     debugCardCount();
 }
 
@@ -353,6 +353,7 @@ function handleGeneralStorePick(cardKey: CardKey) {
         `You pick ${CARD_DEFS[cardKey]?.name || cardKey} from General Store.`,
     );
     G.generalStoreResolve?.(cardKey);
+    G.generalStoreResolve = null;
 }
 
 function handleCardPickerPick(picked: CardPick) {
@@ -940,7 +941,7 @@ function render() {
     <div style="display:flex;gap:8px;flex-wrap:wrap;">`;
         G.generalStoreCards.forEach((cardKey) => {
             const c = CARD_DEFS[cardKey];
-            html += `<div class="card tooltip" data-key="${cardKey}">
+            html += `<div class="card tooltip gs-card" data-gs-key="${cardKey}">
       <span class="card-icon">${c?.icon || '?'}</span>
       <span class="card-name">${c?.name || cardKey}</span>
       <div class="tip">${c?.desc || ''}</div>
@@ -1087,11 +1088,18 @@ function render() {
 
         if (!source || !idx || !key) return;
 
-        card.addEventListener('click', () => {
-            handleCardPickerPick({ source, idx: Number(idx), key });
-            handleGeneralStorePick(key);
-        });
+        card.addEventListener('click', () =>
+            handleCardPickerPick({ source, idx: Number(idx), key }),
+        );
     });
+
+    document
+        .querySelectorAll<HTMLDivElement>('[data-gs-key]')
+        .forEach((card) => {
+            const key = card.dataset.gsKey as CardKey;
+            if (!key) return;
+            card.addEventListener('click', () => handleGeneralStorePick(key));
+        });
 
     const playerRows = document.querySelectorAll(
         '.player-row',
@@ -1603,7 +1611,7 @@ function renderPlayerSlot(p: Player, human: Player) {
         <span class="badge badge-${roleLabel}">${roleLabel}</span>
         ${isCur ? '<span style="font-size:10px;color:#378ADD;">◀</span>' : ''}
         ${isClickTarget ? '<span style="font-size:11px;color:#E24B4A;">🎯</span>' : ''}
-        ${!p.isHuman && p.alive ? `<span class="badge ${dist === 1 ? 'badge-in-range' : 'badge-out-range'}">${dist === 1 ? 'in range' : 'dist ' + dist}</span>` : ''}
+        ${!p.isHuman && p.alive ? `<span class="badge ${dist <= 1 ? 'badge-in-range' : 'badge-out-range'}">${dist <= 1 ? 'in range' : 'dist ' + dist}</span>` : ''}
       </div>
       <div style="margin-top:3px;">${pips}</div>
       <div style="font-size:11px;color:var(--color-text-secondary);margin-top:1px;">${p.hp}/${p.maxHp} HP · ${p.hand.length} cards</div>
