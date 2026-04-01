@@ -1,7 +1,6 @@
-import { CARD_DEFS } from './definitions/cards';
-import { CARD_POOL } from './definitions/deck';
-import { ROLE_INFO } from './definitions/roles';
-import './style.css';
+import { CARD_DEFS } from '@/definitions/cards';
+import { CARD_POOL } from '@/definitions/deck';
+import { ROLE_INFO } from '@/definitions/roles';
 import {
     CardKey,
     CardPick,
@@ -10,76 +9,28 @@ import {
     GameState,
     GridLayout,
     Player,
-    Role,
-} from './types';
+} from '@/types';
+import './style.css';
 
-function initGame(): GameState {
-    const roles = shuffle<Role>([
-        'sheriff',
-        'deputy',
-        'outlaw',
-        'outlaw',
-        'outlaw',
-        'renegade',
-    ]);
+import { shuffle } from '@/game/helpers';
+import { initGame } from '@/game/init';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
 
-    const deck = shuffle<CardKey>([...CARD_POOL]);
+const root = document.getElementById('app');
+if (!root) throw new Error('No #app element found');
 
-    const names = ['You', 'Billy', 'Rosa', 'Duke', 'Jade', 'Matt'];
-
-    const players: Player[] = roles.map((role, i) => ({
-        id: i,
-        name: names[i],
-        role,
-        hp: role === 'sheriff' ? 5 : 4,
-        maxHp: role === 'sheriff' ? 5 : 4,
-        hand: dealN(deck, role === 'sheriff' ? 5 : 4),
-        alive: true,
-        isHuman: i === 0,
-        inPlay: [],
-    }));
-
-    const si = players.findIndex((p) => p.role === 'sheriff');
-
-    return {
-        players,
-        deck,
-        discardPile: [],
-        turn: si,
-        phase: 'draw',
-        bangUsed: false,
-        log: [
-            'Game started! Your role is shown below. Enemy roles stay hidden until death.',
-        ],
-        over: false,
-        winner: null,
-        selectedCard: null,
-        targeting: false,
-        discardingToEndTurn: false,
-        generalStoreCards: [],
-        generalStorePicking: false,
-        generalStorePlayerPicking: false,
-        generalStoreResolve: null,
-        cardPickerPicking: false,
-        cardPickerTarget: null,
-        cardPickerResolve: null,
-        cardPickerLabel: '',
-    };
-}
+createRoot(root).render(
+    <StrictMode>
+        <App />
+    </StrictMode>,
+);
 
 let G: GameState,
     aiRunning = false;
 
 const flashMap: FlashMap = {};
-
-function shuffle<T>(a: T[]): T[] {
-    const r = [...a];
-    for (let i = r.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [r[i], r[j]] = [r[j], r[i]];
-    }
-    return r;
-}
 
 function dealN(deck: CardKey[], n: number): CardKey[] {
     const cards: CardKey[] = [];
@@ -285,7 +236,7 @@ async function resolveGeneralStore() {
 
     // determine pick order starting from current turn
     const pickOrder = [];
-    let idx = G.players.findIndex((p) => p.id === G.turn);
+    const idx = G.players.findIndex((p) => p.id === G.turn);
     for (let i = 0; i < alivePlayers.length; i++) {
         const p = G.players[(idx + i) % G.players.length];
         if (p.alive) pickOrder.push(p);
@@ -1473,9 +1424,9 @@ function restartGame() {
     if (!G.players[G.turn].isHuman) runAI();
 }
 
-G = initGame();
-render();
-if (!G.players[G.turn].isHuman) runAI();
+//G = initGame();
+//render();
+//if (!G.players[G.turn].isHuman) runAI();
 
 function getGridLayout(playerCount: number) {
     // returns { cols, positions: [{id, row, col}], deckRow, deckCol }

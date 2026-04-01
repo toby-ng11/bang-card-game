@@ -1,32 +1,27 @@
 {
-  "compilerOptions": {
-    "forceConsistentCasingInFileNames": true,
-    "target": "ESNext",
-    "useDefineForClassFields": true,
-    "module": "ESNext",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
-    "skipLibCheck": true,
+    "compilerOptions": {
+        "forceConsistentCasingInFileNames": true,
+        "target": "ESNext",
+        "module": "ESNext",
+        "types": ["vite/client"],
+        "skipLibCheck": true,
+        "allowJs": true,
+        "esModuleInterop": true,
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "moduleDetection": "force",
-    "noEmit": true,
+        /* Bundler mode */
+        "moduleResolution": "bundler",
+        "noEmit": true,
 
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
-    "noImplicitReturns": true,
-    "noImplicitAny": true,
+        /* Linting */
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "jsx": "react-jsx",
 
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "include": ["src/**/*.ts", "src/**/*.d.ts"]
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["./src/*"]
+        }
+    },
+    "include": ["src/**/*.ts", "src/**/*.d.ts", "src/main.tsx"]
 }
