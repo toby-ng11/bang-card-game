@@ -14,7 +14,7 @@ function initGame(): GameState {
 
     const deck = shuffle<CardKey>([...CARD_POOL]);
 
-    const names = ['You', 'Billy', 'Rosa', 'Duke', 'Jade', 'Matt'];
+    const names = ['You', 'Billy', 'Rosa', 'Duke', 'Matt', 'Cam'];
 
     const players: Player[] = roles.map((role, i) => ({
         id: i,

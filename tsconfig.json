@@ -3,10 +3,10 @@
         "forceConsistentCasingInFileNames": true,
         "target": "ESNext",
         "module": "ESNext",
-        "types": ["vite/client"],
         "skipLibCheck": true,
         "allowJs": true,
         "esModuleInterop": true,
+        "types": ["vite/client"],
 
         /* Bundler mode */
         "moduleResolution": "bundler",
@@ -18,10 +18,9 @@
         "strictNullChecks": true,
         "jsx": "react-jsx",
 
-        "baseUrl": ".",
         "paths": {
             "@/*": ["./src/*"]
         }
     },
-    "include": ["src/**/*.ts", "src/**/*.d.ts", "src/main.tsx"]
+    "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx"]
 }

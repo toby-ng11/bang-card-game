@@ -90,8 +90,6 @@ export interface GridPosition {
 export interface GridLayout {
   cols: number;
   positions: GridPosition[];
-  deckRow: number;
-  deckCol: number;
 }
 
 // ── Role info ────────────────────────────────────────────────────

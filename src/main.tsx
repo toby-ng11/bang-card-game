@@ -7,7 +7,6 @@ import {
     CardPickSource,
     FlashMap,
     GameState,
-    GridLayout,
     Player,
 } from '@/types';
 import './style.css';
@@ -888,7 +887,7 @@ function render() {
   </div>`;
 
     // Players
-    html += renderTable();
+    //html += renderTable();
 
     if (G.generalStorePicking) {
         html += `<div style="margin-bottom:12px;">
@@ -1385,7 +1384,7 @@ function handleEndTurn() {
     }
     nextTurn();
     render();
-    runAI();
+    //runAI();
 }
 
 function showGameOver() {
@@ -1427,173 +1426,6 @@ function restartGame() {
 //G = initGame();
 //render();
 //if (!G.players[G.turn].isHuman) runAI();
-
-function getGridLayout(playerCount: number) {
-    // returns { cols, positions: [{id, row, col}], deckRow, deckCol }
-    const layouts: Record<number, GridLayout> = {
-        4: {
-            cols: 3,
-            positions: [
-                { id: 0, row: 1, col: 1 }, // you
-                { id: 1, row: 1, col: 2 }, // 2
-                { id: 2, row: 2, col: 2 }, // 3
-                { id: 3, row: 2, col: 1 }, // 4
-            ],
-            deckRow: 1,
-            deckCol: 3,
-        },
-        5: {
-            cols: 4,
-            positions: [
-                { id: 0, row: 1, col: 1 },
-                { id: 1, row: 1, col: 2 },
-                { id: 2, row: 1, col: 3 },
-                { id: 3, row: 2, col: 2 },
-                { id: 4, row: 2, col: 1 },
-            ],
-            deckRow: 1,
-            deckCol: 4,
-        },
-        6: {
-            cols: 4,
-            positions: [
-                { id: 0, row: 1, col: 1 },
-                { id: 1, row: 1, col: 2 },
-                { id: 2, row: 1, col: 3 },
-                { id: 3, row: 2, col: 3 },
-                { id: 4, row: 2, col: 2 },
-                { id: 5, row: 2, col: 1 },
-            ],
-            deckRow: 1,
-            deckCol: 4,
-        },
-        7: {
-            cols: 4,
-            positions: [
-                { id: 0, row: 1, col: 1 },
-                { id: 1, row: 1, col: 2 },
-                { id: 2, row: 1, col: 3 },
-                { id: 3, row: 1, col: 4 }, // flexible 7th wraps to top right
-                { id: 4, row: 2, col: 3 },
-                { id: 5, row: 2, col: 2 },
-                { id: 6, row: 2, col: 1 },
-            ],
-            deckRow: 2,
-            deckCol: 4, // deck shifts down when 7 players
-        },
-    };
-    return layouts[playerCount] || layouts[5];
-}
-
-function renderTable() {
-    //const alive = G.players.filter((p) => p.alive).length;
-    const total = G.players.length;
-    const human = G.players[0];
-    const layout = getGridLayout(total);
-
-    let html = `<div style="
-    display: grid;
-    grid-template-columns: repeat(${layout.cols}, 1fr);
-    gap: 8px;
-    margin-bottom: 16px;
-  ">`;
-
-    // place each player at their grid position
-    layout.positions.forEach(({ id, row, col }) => {
-        const p = G.players[id];
-        html += `<div style="grid-column:${col}; grid-row:${row};">
-      ${renderPlayerSlot(p, human)}
-    </div>`;
-    });
-
-    // draw & discard pile
-    html += `<div style="grid-column:${layout.deckCol}; grid-row:${layout.deckRow};">
-    ${renderDeckSlot()}
-  </div>`;
-
-    html += `</div>`;
-    return html;
-}
-
-function renderDeckSlot() {
-    const top = G.discardPile[G.discardPile.length - 1];
-    const c = top ? CARD_DEFS[top] : null;
-    return `<div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
-    <div style="font-size:11px;color:var(--color-text-secondary);font-weight:500;">DECK</div>
-    <div class="card back" style="cursor:default;">
-      <span class="card-icon">🂠</span>
-      <span class="card-name">${G.deck.length} left</span>
-    </div>
-    <div style="font-size:11px;color:var(--color-text-secondary);font-weight:500;">DISCARD</div>
-    <div class="card" style="cursor:default;opacity:${c ? 1 : 0.3};">
-      <span class="card-icon">${c?.icon || '?'}</span>
-      <span class="card-name">${c?.name || 'empty'}</span>
-      <span class="card-name">${G.discardPile.length} cards</span>
-    </div>
-  </div>`;
-}
-
-function renderPlayerSlot(p: Player, human: Player) {
-    let canTargetAllPlayers = false;
-
-    if (G.selectedCard !== null) {
-        const selectedCard = human.hand[G.selectedCard];
-        canTargetAllPlayers = ['catbalou', 'duel'].includes(selectedCard);
-    }
-
-    const isClickTarget =
-        G.targeting &&
-        !p.isHuman &&
-        p.alive &&
-        (canTargetAllPlayers ? true : inRange(human.id, p.id));
-
-    const isCur = p.id === G.turn;
-    const showRole = p.role === 'sheriff' || !p.alive || p.isHuman;
-    const roleLabel = showRole ? p.role : 'unknown';
-    const flash = flashMap[p.id] || '';
-    const dist = p.isHuman ? 0 : distance(0, p.id);
-    const pips = Array(p.maxHp)
-        .fill(0)
-        .map(
-            (_, i) =>
-                `<span class="hp-pip" style="background:${i < p.hp ? '#D85A30' : 'var(--color-border-secondary)'};"></span>`,
-        )
-        .join('');
-
-    return `<div class="player-row ${!p.alive ? 'dead' : ''} ${isClickTarget ? 'clickable-target' : ''} ${isCur ? 'flash-current' : ''} ${flash}"
-    data-pid="${p.id}">
-    <div style="flex:1;">
-      <div style="font-weight:500;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:2px;">
-        ${p.name}
-        <span class="badge badge-${roleLabel}">${roleLabel}</span>
-        ${isCur ? '<span style="font-size:10px;color:#378ADD;">◀</span>' : ''}
-        ${isClickTarget ? '<span style="font-size:11px;color:#E24B4A;">🎯</span>' : ''}
-        ${!p.isHuman && p.alive ? `<span class="badge ${dist === 1 ? 'badge-in-range' : 'badge-out-range'}">${dist === 1 ? 'in range' : 'dist ' + dist}</span>` : ''}
-      </div>
-      <div style="margin-top:3px;">${pips}</div>
-      <div style="font-size:11px;color:var(--color-text-secondary);margin-top:1px;">${p.hp}/${p.maxHp} HP · ${p.hand.length} cards</div>
-      ${
-          p.inPlay.length
-              ? `
-        <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">
-      ${p.inPlay
-          .map((cardKey) => {
-              const c = CARD_DEFS[cardKey];
-              return `<div style="
-          display:inline-flex; align-items:center; gap:3px;
-          background:#E6F1FB; color:#042C53;
-          border:1px solid #185FA5; border-radius:4px;
-          font-size:10px; font-weight:500; padding:2px 6px;">
-          ${c?.icon || '?'} ${c?.name || cardKey}
-        </div>`;
-          })
-          .join('')}
-    </div>`
-              : ''
-      }
-    </div>
-  </div>`;
-}
 
 const EXPECTED_TOTAL = CARD_POOL.length;
 
