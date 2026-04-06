@@ -4,7 +4,7 @@ import { Player, Role } from '@/types';
 import { cva } from 'class-variance-authority';
 
 const bannerVariants = cva(
-    'flex items-center gap-3 rounded-lg px-4 py-3 mb-3 text-sm',
+    'flex items-center gap-3 rounded-lg px-4 py-3 text-sm',
     {
         variants: {
             role: {
@@ -27,10 +27,10 @@ export default function RoleBanner({ human }: RoleBannerProps) {
         <div className={cn(bannerVariants({ role: human.role }))}>
             <div className="text-2xl">🤠</div>
             <div>
-                <div className="text-sm font-medium">
-                    You are the <strong>{ri.label}</strong>
+                <div className="text-lg font-medium">
+                    You are the <strong>{ri.label}</strong>.
                 </div>
-                <div className="text-xs opacity-85">{ri.goal}</div>
+                <div className="text-sm opacity-85">{ri.goal}</div>
             </div>
             <div className="ml-auto text-right text-xs">
                 HP:{' '}

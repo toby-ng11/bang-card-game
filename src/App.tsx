@@ -206,7 +206,7 @@ export default function App() {
     }, [dispatch]);
 
     return (
-        <div id="game">
+        <div id="game" className="flex flex-col gap-4 p-4">
             <div
                 id="float-card"
                 className="pointer-events-none fixed z-50 flex h-18 w-13 flex-col items-center justify-center rounded-md border border-gray-300 bg-white text-[10px] font-medium opacity-0"

@@ -3,6 +3,7 @@ import { distance, inRange } from '@/game/helpers';
 import { cn } from '@/lib/utils';
 import { CardKey, Player, Role } from '@/types';
 import { cva } from 'class-variance-authority';
+import { Badge } from './ui/badge';
 
 interface PlayerSlotProps {
     p: Player;
@@ -15,14 +16,13 @@ interface PlayerSlotProps {
     onPlayerClick: (id: number) => void;
 }
 
-const roleVariants = cva('badge', {
+const roleVariants = cva('text-[10px] font-medium px-[7px] py-[2px] ml-1', {
     variants: {
         role: {
-            sheriff: 'badge-sheriff',
-            deputy: 'badge-deputy',
-            outlaw: 'badge-outlaw',
-            renegade: 'badge-renegade',
-            unknown: 'badge-unknown',
+            sheriff: 'bg-[#faeeda] text-[#633806] border-transparent',
+            deputy: 'bg-[#e6f1fb] text-[#042c53] border-transparent',
+            outlaw: 'bg-[#fcebeb] text-[#501313] border-transparent',
+            renegade: 'bg-[#eeedfe] text-[#26215c] border-transparent',
         },
     },
 });
@@ -57,11 +57,11 @@ export default function PlayerSlot({
             data-pid={p.id}
             onClick={() => onPlayerClick(p.id)}
             className={cn(
-                'player-row relative flex flex-col rounded-lg border border-black/20 px-3 py-2 transition duration-300 ease-in-out hover:border-black',
+                'player-row relative flex cursor-pointer flex-col rounded-lg border border-black/20 px-3 py-2 transition duration-300 ease-in-out hover:border-black',
                 !p.alive && 'dead',
                 targeting &&
                     (isClickTarget
-                        ? 'border-red-500/30 hover:border-red-500'
+                        ? 'border-red-500/30 hover:border-red-500 hover:bg-red-400/30'
                         : 'cursor-not-allowed opacity-40'),
                 isCur && 'border-l-5 border-l-blue-500 hover:border-l-blue-500',
                 flashClass,
@@ -73,36 +73,31 @@ export default function PlayerSlot({
                     <span className="relative inline-flex size-3 rounded-full bg-red-500"></span>
                 </span>
             )}
-            <div className="flex-1">
+            <div className="flex flex-col gap-1.5">
                 {/* Name row */}
-                <div className="flex flex-wrap items-center gap-0.5 text-[13px] font-medium">
+                <div className="flex flex-wrap items-center gap-2 text-lg font-medium">
                     {p.name}
-                    <span
+                    <Badge
+                        variant="secondary"
                         className={cn(
                             roleVariants({ role: roleLabel as Role }),
                         )}
                     >
                         {roleLabel}
-                    </span>
-                    {isCur && (
-                        <span className="text-blue-400">◀</span>
-                    )}
+                    </Badge>
+                    {isCur && <span className="text-blue-400">◀</span>}
                     {!p.isHuman && p.alive && (
-                        <span
-                            className={cn(
-                                'badge',
-                                dist === 1
-                                    ? 'badge-in-range'
-                                    : 'badge-out-range',
-                            )}
+                        <Badge
+                            variant="outline"
+                            className="size-4 rounded-full p-2"
                         >
-                            {dist === 1 ? 'in range' : 'dist ' + dist}
-                        </span>
+                            {dist}
+                        </Badge>
                     )}
                 </div>
 
                 {/* HP pips */}
-                <div className="mt-0.5 flex gap-0.5">
+                <div className="mt-0.5 flex gap-1">
                     {Array(p.maxHp)
                         .fill(0)
                         .map((_, i) => (

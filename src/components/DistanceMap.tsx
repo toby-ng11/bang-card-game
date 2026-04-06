@@ -11,7 +11,7 @@ export default function DistanceMap({ players }: DistanceMapProps) {
     const dead = players.filter((p) => !p.alive && p.id !== 0);
 
     return (
-        <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
             <div className="mb-2 text-[11px] font-medium tracking-wide text-gray-500 uppercase">
                 Distance from you (range 1 = can BANG!)
             </div>
