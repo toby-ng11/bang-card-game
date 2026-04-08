@@ -1,4 +1,5 @@
-import { CardKey, GameState, Player } from '@/types';
+import { GameAction } from '@/gameReducer';
+import { CardKey, CardPick, GameState, Player } from '@/types';
 
 function shuffle<T>(a: T[]): T[] {
     const r = [...a];
@@ -52,21 +53,43 @@ function dealN(
     state: GameState,
     n: number,
 ): { cards: CardKey[]; state: GameState } {
-    let current = state;
-    const cards: CardKey[] = [];
+    let currentDeck = [...state.deck];
+    let currentDiscard = [...state.discardPile];
 
-    for (let i = 0; i < n; i++) {
-        if (current.deck.length === 0) {
-            current = refillDeck(current);
-        }
-        if (current.deck.length) {
-            const deck = [...current.deck];
-            cards.push(deck.shift()!);
-            current = { ...current, deck };
-        }
+    if (currentDeck.length < n) {
+        const shuffledDiscard = shuffle(currentDiscard);
+        currentDeck = [...currentDeck, ...shuffledDiscard];
+        currentDiscard = [];
     }
 
-    return { cards, state: current };
+    const drawnCards = currentDeck.slice(0, n);
+    const remainingDeck = currentDeck.slice(n);
+
+    return {
+        cards: drawnCards,
+        state: {
+            ...state,
+            deck: remainingDeck,
+            discardPile: currentDiscard,
+        },
+    };
 }
 
-export { dealN, distance, inRange, refillDeck, shuffle };
+function waitForCardPick(
+    state: GameState,
+    targetId: number,
+    label: string,
+    dispatch: React.Dispatch<GameAction>,
+): Promise<CardPick> {
+    return new Promise((res) => {
+        dispatch({
+            type: 'SET_CARD_PICKER',
+            picking: true,
+            target: targetId,
+            label,
+            resolve: res,
+        });
+    });
+}
+
+export { dealN, distance, inRange, refillDeck, shuffle, waitForCardPick };

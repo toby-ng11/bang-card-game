@@ -2,6 +2,14 @@ import { CARD_POOL } from '@/definitions/deck';
 import { CardKey, GameState, Player, Role } from '@/types';
 import { shuffle } from './helpers';
 
+function dealN(deck: CardKey[], n: number): CardKey[] {
+    const cards: CardKey[] = [];
+    for (let i = 0; i < n; i++) {
+        cards.push(deck.shift()!);
+    }
+    return cards;
+}
+
 function initGame(): GameState {
     const roles = shuffle<Role>([
         'sheriff',
@@ -22,7 +30,7 @@ function initGame(): GameState {
         role,
         hp: role === 'sheriff' ? 5 : 4,
         maxHp: role === 'sheriff' ? 5 : 4,
-        hand: [],
+        hand: dealN(deck, role === 'sheriff' ? 5 : 4),
         alive: true,
         isHuman: i === 0,
         inPlay: [],

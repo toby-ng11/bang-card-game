@@ -1,5 +1,6 @@
+import { GameAction } from '@/gameReducer';
 import { FlashMap, GameState, Player } from '@/types';
-import { popupOnPlayer } from './animation';
+import { popupOnPlayer, showBanner, wait } from './animation';
 import { dealN } from './helpers';
 
 // ── Check win condition ─────────────────────────────────────────
@@ -145,6 +146,52 @@ export async function checkBang(
     } else {
         await popupOnPlayer(target.id, 'indians', 'indians-pop');
         newState = applyDamage(newState, target.id, 1, source.id, flashMap);
+    }
+
+    return newState;
+}
+
+export async function resolveDuel(
+    state: GameState,
+    challengerId: number,
+    targetId: number,
+    flashMap: FlashMap,
+    dispatch: React.Dispatch<GameAction>,
+): Promise<GameState> {
+    let current = targetId;
+    let other = challengerId;
+    let newState = structuredClone(state);
+
+    while (true) {
+        const p = newState.players[current];
+        const bangIdx = p.hand.indexOf('bang');
+
+        if (bangIdx >= 0) {
+            const [bang] = p.hand.splice(bangIdx, 1);
+            newState.discardPile.push(bang);
+            newState.log = [
+                `${p.name} plays BANG! to stay in the duel.`,
+                ...newState.log,
+            ].slice(0, 25);
+            await Promise.all([
+                popupOnPlayer(p.id, 'bang', 'bang-pop'),
+                showBanner(`${p.name} plays BANG! ⚔️`, 800),
+            ]);
+            dispatch({ type: 'SET_STATE', state: newState });
+        } else {
+            newState.log = [
+                `${p.name} has no BANG! and loses the duel.`,
+                ...newState.log,
+            ].slice(0, 25);
+            await showBanner(`${p.name} loses the duel! 💀`, 900);
+            newState = applyDamage(newState, p.id, 1, other, flashMap);
+            dispatch({ type: 'SET_STATE', state: newState });
+            break;
+        }
+
+        [current, other] = [other, current];
+        await wait(400);
+        if (newState.over) break;
     }
 
     return newState;

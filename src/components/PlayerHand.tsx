@@ -1,6 +1,7 @@
 import { CARD_DEFS } from '@/definitions/cards';
 import { cn } from '@/lib/utils';
 import { CardKey } from '@/types';
+import { Button } from './ui/button';
 
 interface PlayerHandProps {
     hand: CardKey[];
@@ -17,7 +18,7 @@ export default function PlayerHand({
 }: PlayerHandProps) {
     return (
         <div className="mb-3">
-            <div className="mb-2 text-xs font-medium tracking-wide text-gray-500 uppercase">
+            <div className="mb-2 text-center text-xs font-medium tracking-wide text-gray-500 uppercase">
                 {discardingToEndTurn ? (
                     <span className="text-red-500 normal-case">
                         Discard {hand.length} card(s) to end your turn — click a
@@ -28,7 +29,7 @@ export default function PlayerHand({
                 )}
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap justify-center gap-4">
                 {hand.length === 0 && (
                     <span className="text-sm text-gray-500">No cards.</span>
                 )}
@@ -37,19 +38,25 @@ export default function PlayerHand({
                     if (!c) return null;
                     const isSel = selectedCard === i;
                     return (
-                        <div
+                        <Button
                             key={`${cardKey}-${crypto.randomUUID()}`}
                             onClick={() => onCardClick(i)}
-                            title={c.desc}
+                            variant="secondary"
                             className={cn(
-                                'card tooltip cursor-pointer',
-                                isSel && 'selected',
+                                'flex min-h-35 w-25 cursor-pointer flex-col items-center gap-4 rounded-sm border py-4 hover:scale-110',
+                                c.color === 'brown' &&
+                                    'border border-amber-600 bg-amber-500/20 hover:bg-amber-500/40',
+                                c.color === 'blue' &&
+                                    'border border-blue-500 bg-blue-400/20 hover:bg-blue-400/40',
+                                isSel && 'border-3',
                                 discardingToEndTurn && 'border-red-500',
                             )}
                         >
-                            <span className="card-icon">{c.icon}</span>
-                            <span className="card-name">{c.name}</span>
-                        </div>
+                            <div className="text-xl font-bold font-stretch-extra-condensed">
+                                {c.name}
+                            </div>
+                            <div className="text-3xl">{c.icon}</div>
+                        </Button>
                     );
                 })}
             </div>

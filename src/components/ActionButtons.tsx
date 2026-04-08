@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { CardKey, GameState, Player } from '@/types';
 
 interface ActionButtonsProps {
@@ -30,12 +31,12 @@ export default function ActionButtons({
         ['bang', 'panic', 'catbalou', 'duel'].includes(selectedCardKey);
 
     return (
-        <div className="mb-3 flex flex-wrap gap-2">
+        <div className="mb-3 flex flex-wrap justify-center gap-2">
             {/* Draw phase */}
             {isMyTurn && G.phase === 'draw' && (
-                <button className="btn btn-primary" onClick={onDraw}>
+                <Button variant="outline" onClick={onDraw}>
                     Draw 2 Cards
-                </button>
+                </Button>
             )}
 
             {/* Play phase */}
@@ -44,39 +45,21 @@ export default function ActionButtons({
                     {G.selectedCard !== null &&
                         !G.targeting &&
                         (needsTarget ? (
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={onTargetPlayer}
-                            >
+                            <Button onClick={onTargetPlayer}>
                                 Target Player
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={onPlayCard}
-                            >
-                                Play Card
-                            </button>
-                        ))}
+                            </Button>
+                        ) : selectedCardKey !== 'missed' ? (
+                            <Button onClick={onPlayCard}>Play Card</Button>
+                        ) : null)}
                     {G.targeting && (
-                        <button
-                            type="button"
-                            className="btn"
-                            onClick={onCancelTarget}
-                        >
+                        <Button variant="outline" onClick={onCancelTarget}>
                             Cancel
-                        </button>
+                        </Button>
                     )}
                     {!G.targeting && (
-                        <button
-                            type="button"
-                            className="btn"
-                            onClick={onEndTurn}
-                        >
+                        <Button variant="secondary" onClick={onEndTurn}>
                             End Turn
-                        </button>
+                        </Button>
                     )}
                 </>
             )}

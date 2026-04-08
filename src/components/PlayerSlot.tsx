@@ -68,10 +68,7 @@ export default function PlayerSlot({
             )}
         >
             {isClickTarget && (
-                <span className="absolute top-0 right-0 -mt-1 -mr-1 flex size-3">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex size-3 rounded-full bg-red-500"></span>
-                </span>
+                <div className="absolute inset-0 animate-ping rounded-lg border-2 border-red-400"></div>
             )}
             <div className="flex flex-col gap-1.5">
                 {/* Name row */}

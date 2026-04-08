@@ -5,8 +5,8 @@ import { CardKey, CardPick, GameState } from './types';
 type GameAction =
     | { type: 'SET_STATE'; state: GameState }
     | { type: 'SET_PHASE'; phase: GameState['phase'] }
-    | { type: 'SET_TARGETING'; targeting: boolean }
     | { type: 'SET_SELECTED_CARD'; idx: number | null }
+    | { type: 'SET_TARGETING'; targeting: boolean }
     | { type: 'SET_DISCARDING_TO_END_TURN'; value: boolean }
     | { type: 'SET_BANG_USED'; value: boolean }
     | {
@@ -31,6 +31,7 @@ type GameAction =
     | { type: 'END_TURN' };
 
 function gameReducer(state: GameState, action: GameAction): GameState {
+    console.log('REDUCER ACTION:', action);
     switch (action.type) {
         case 'SET_STATE':
             return action.state;
@@ -38,6 +39,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         case 'ADD_LOG': {
             const log = [action.msg, ...state.log].slice(0, 25);
             return { ...state, log };
+        }
+
+        case 'DRAW_CARDS_TO_START_TURN': {
+            const { cards, state: newState } = dealN(state, 2);
+            return {
+                ...newState,
+                players: newState.players.map((p, idx) =>
+                    idx === newState.turn
+                        ? { ...p, hand: [...p.hand, ...cards] }
+                        : p,
+                ),
+                phase: 'play',
+                bangUsed: false,
+                log: [`You draws 2 cards.`, ...newState.log].slice(0, 25),
+            };
         }
 
         case 'SET_PHASE':
@@ -97,15 +113,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 generalStoreResolve: action.resolve,
             };
 
-        case 'DRAW_CARDS_TO_START_TURN': {
-            const { cards, state: newState } = dealN(state, 2);
-            newState.players[0].hand.push(...cards);
-            newState.phase = 'play';
-            newState.bangUsed = false;
-            newState.log = ['You draw 2 cards.', ...newState.log].slice(0, 25);
-            return newState;
-        }
-
         case 'DISCARD_CARD_FROM_HAND': {
             const newState = structuredClone(state);
             const player = newState.players[0];
@@ -133,78 +140,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 newState.selectedCard = null;
                 newState.targeting = false;
             }
-            return newState;
-        }
-
-        case 'PLAY_CARD': {
-            // only handles non-targeted cards
-            // targeted cards (bang, panic, catbalou, duel) go through PLAY_TARGETED_CARD
-            const newState = structuredClone(state);
-            const p = newState.players[0];
-            if (newState.selectedCard === null) return state;
-
-            const cardKey = p.hand[newState.selectedCard];
-            p.hand.splice(newState.selectedCard, 1);
-            newState.selectedCard = null;
-            newState.discardPile.push(cardKey);
-
-            switch (cardKey) {
-                case 'beer': {
-                    if (newState.players.filter((q) => q.alive).length <= 2) {
-                        newState.log = [
-                            'Beer has no effect with 2 players left.',
-                            ...newState.log,
-                        ].slice(0, 25);
-                        newState.discardPile.push(cardKey);
-                        break;
-                    }
-                    p.hp = Math.min(p.maxHp, p.hp + 1);
-                    newState.log = [
-                        `You drink Beer → ${p.hp}/${p.maxHp} HP.`,
-                        ...newState.log,
-                    ].slice(0, 25);
-                    break;
-                }
-                case 'mustang': {
-                    newState.discardPile.pop(); // mustang goes to inPlay not discard
-                    p.inPlay.push(cardKey);
-                    newState.log = [
-                        'You play Mustang! Others see you as 1 further away.',
-                        ...newState.log,
-                    ].slice(0, 25);
-                    break;
-                }
-                case 'scope': {
-                    newState.discardPile.pop(); // scope goes to inPlay not discard
-                    p.inPlay.push(cardKey);
-                    newState.log = [
-                        'You play Scope! You view others as distance -1.',
-                        ...newState.log,
-                    ].slice(0, 25);
-                    break;
-                }
-                case 'stagecoach': {
-                    const { cards, state: afterDraw } = dealN(newState, 2);
-                    Object.assign(newState, afterDraw);
-                    newState.players[0].hand.push(...cards);
-                    newState.log = [
-                        'You play Stagecoach! Drew 2 cards.',
-                        ...newState.log,
-                    ].slice(0, 25);
-                    break;
-                }
-                case 'wellsfargo': {
-                    const { cards, state: afterDraw } = dealN(newState, 3);
-                    Object.assign(newState, afterDraw);
-                    newState.players[0].hand.push(...cards);
-                    newState.log = [
-                        'You play Wells Fargo! Drew 3 cards.',
-                        ...newState.log,
-                    ].slice(0, 25);
-                    break;
-                }
-            }
-
             return newState;
         }
 

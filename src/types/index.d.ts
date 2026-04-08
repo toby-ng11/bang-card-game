@@ -21,7 +21,7 @@ export interface CardDef {
   name: string;
   icon: string;
   desc: string;
-  type: CardType;
+  color: CardType;
 }
 
 // ── Players ──────────────────────────────────────────────────────

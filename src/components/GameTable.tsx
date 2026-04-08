@@ -20,7 +20,7 @@ export default function GameTable({
     const layout = getGridLayout(G.players.length);
 
     return (
-        <div className="flex flex-row gap-2">
+        <div className="flex flex-row justify-center gap-2">
             <div className={cn('mb-4 grid gap-2', gridCols[layout.cols])}>
                 {layout.positions.map(({ id, row, col }) => {
                     const p = G.players[id];
@@ -44,9 +44,7 @@ export default function GameTable({
                     );
                 })}
             </div>
-            <div className="flex flex-col gap-2">
-                <DeckSlot deck={G.deck} discardPile={G.discardPile} />
-            </div>
+            <DeckSlot deck={G.deck} discardPile={G.discardPile} />
         </div>
     );
 }

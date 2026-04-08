@@ -13,12 +13,15 @@ import {
     popupOnPlayer,
     showBanner,
 } from '@/game/animation';
-import { checkBang, checkMissed } from '@/game/combat';
+import { checkBang, checkMissed, checkWin, resolveDuel } from '@/game/combat';
 import { resolveGeneralStore } from '@/game/general-store';
 import { initGame } from '@/game/init';
 import { gameReducer } from '@/gameReducer';
 import { CardKey, CardPick, FlashMap } from '@/types';
 import { useCallback, useReducer, useRef } from 'react';
+import GameLog from './components/GameLog';
+import GameOverDialog from './components/GameOverDialog';
+import { dealN, distance, inRange, waitForCardPick } from './game/helpers';
 
 export default function App() {
     const [G, dispatch] = useReducer(gameReducer, null, initGame);
@@ -28,10 +31,28 @@ export default function App() {
     const GRef = useRef(G);
     GRef.current = G;
 
-    const handlePlayerClick = useCallback((id: number) => {
-        // will wire up later
-        console.log('player clicked', id);
-    }, []);
+    const handleDraw = () => {
+        if (!G.players[G.turn].isHuman || G.phase !== 'draw') return;
+        dispatch({ type: 'DRAW_CARDS_TO_START_TURN' });
+    };
+
+    const handleCardClick = useCallback(
+        (i: number) => {
+            if (!G.players[G.turn].isHuman || G.phase !== 'play' || G.targeting)
+                return;
+
+            if (G.discardingToEndTurn) {
+                dispatch({ type: 'DISCARD_CARD_FROM_HAND', idx: i });
+                return;
+            }
+
+            dispatch({
+                type: 'SET_SELECTED_CARD',
+                idx: G.selectedCard === i ? null : i,
+            });
+        },
+        [G, dispatch],
+    );
 
     // human picks a card from general store
     const handleGeneralStorePick = useCallback(
@@ -60,46 +81,231 @@ export default function App() {
         await resolveGeneralStore(() => GRef.current, dispatch);
     }, [dispatch]);
 
-    const handleCardPickerPick = (picked: CardPick) => {
-        if (!G.cardPickerPicking) return;
-        G.cardPickerPicking = false;
-        G.cardPickerTarget = null;
-        G.cardPickerLabel = '';
-        G.cardPickerResolve?.(picked);
-        G.cardPickerResolve = null;
-    };
+    const handleCardPickerPick = useCallback(
+        (picked: CardPick) => {
+            const state = GRef.current;
+            if (!state.cardPickerPicking) return;
+            state.cardPickerResolve?.(picked);
+            dispatch({
+                type: 'SET_CARD_PICKER',
+                picking: false,
+                target: null,
+                label: '',
+                resolve: null,
+            });
+        },
+        [dispatch],
+    );
 
-    const handleCardClick = useCallback(
-        (i: number) => {
-            if (!G.players[G.turn].isHuman || G.phase !== 'play' || G.targeting)
-                return;
+    const handlePlayerClick = useCallback(
+        async (targetId: number) => {
+            const state = GRef.current;
+            console.log('handlePlayerClick', {
+                targeting: state.targeting,
+                selectedCard: state.selectedCard,
+                targetId,
+            });
+            if (!state.targeting || state.selectedCard === null) return;
 
-            if (G.discardingToEndTurn) {
-                dispatch({ type: 'DISCARD_CARD_FROM_HAND', idx: i });
+            const p = state.players[0];
+            const target = state.players[targetId];
+            if (!target.alive || target.isHuman) return;
+
+            const cardKey = p.hand[state.selectedCard];
+
+            // range check for range-dependent cards
+            const needsRange = ['bang', 'panic'].includes(cardKey);
+            if (needsRange && !inRange(state.players, 0, targetId)) {
+                const s = structuredClone(state);
+                s.log = [
+                    `${target.name} is out of range! (distance ${distance(state.players, 0, targetId)})`,
+                    ...s.log,
+                ].slice(0, 25);
+                dispatch({ type: 'SET_STATE', state: s });
                 return;
             }
 
-            dispatch({
-                type: 'SET_SELECTED_CARD',
-                idx: G.selectedCard === i ? null : i,
-            });
-        },
-        [G, dispatch],
-    );
+            // remove card from hand
+            const initState = structuredClone(state);
+            const cardIdx = initState.players[0].hand.indexOf(cardKey);
+            initState.players[0].hand.splice(cardIdx, 1);
+            initState.selectedCard = null;
+            initState.targeting = false;
+            initState.discardPile.push(cardKey);
+            dispatch({ type: 'SET_STATE', state: initState });
 
-    const handleDraw = useCallback(() => {
-        if (!G.players[G.turn].isHuman || G.phase !== 'draw') return;
-        dispatch({ type: 'DRAW_CARDS_TO_START_TURN' });
-    }, [G, dispatch]);
+            switch (cardKey) {
+                case 'bang': {
+                    if (state.bangUsed) {
+                        // give card back
+                        const s = structuredClone(GRef.current);
+                        s.players[0].hand.push(cardKey);
+                        s.discardPile.splice(
+                            s.discardPile.lastIndexOf(cardKey),
+                            1,
+                        );
+                        s.log = [
+                            'Already used BANG! this turn!',
+                            ...s.log,
+                        ].slice(0, 25);
+                        dispatch({ type: 'SET_STATE', state: s });
+                        return;
+                    }
+                    const bangUsedState = structuredClone(GRef.current);
+                    bangUsedState.bangUsed = true;
+                    dispatch({ type: 'SET_STATE', state: bangUsedState });
+
+                    await floatCard(
+                        'bang',
+                        getPlayerEl(0),
+                        getPlayerEl(targetId),
+                    );
+                    const afterBang = await checkMissed(
+                        GRef.current,
+                        target,
+                        p,
+                        flashMapRef.current,
+                    );
+                    dispatch({ type: 'SET_STATE', state: afterBang });
+                    break;
+                }
+
+                case 'panic': {
+                    const hasCards =
+                        target.hand.length > 0 || target.inPlay.length > 0;
+                    if (!hasCards) {
+                        const s = structuredClone(GRef.current);
+                        s.log = [
+                            `${target.name} has no cards.`,
+                            ...s.log,
+                        ].slice(0, 25);
+                        dispatch({ type: 'SET_STATE', state: s });
+                        return;
+                    }
+                    await floatCard(
+                        'panic',
+                        getPlayerEl(0),
+                        getPlayerEl(targetId),
+                    );
+
+                    const picked = await waitForCardPick(
+                        GRef.current,
+                        targetId,
+                        `😱 Panic! — choose a card to steal from ${target.name}`,
+                        dispatch,
+                    );
+
+                    const panicState = structuredClone(GRef.current);
+                    const t = panicState.players[targetId];
+                    if (picked.source === 'hand') {
+                        t.hand.splice(picked.idx, 1);
+                    } else {
+                        t.inPlay.splice(picked.idx, 1);
+                    }
+                    panicState.players[0].hand.push(picked.key);
+                    await floatCard(
+                        picked.key,
+                        getPlayerEl(targetId),
+                        getPlayerEl(0),
+                    );
+                    panicState.log = [
+                        `You steal ${CARD_DEFS[picked.key]?.name || picked.key} from ${target.name}!`,
+                        ...panicState.log,
+                    ].slice(0, 25);
+                    dispatch({ type: 'SET_STATE', state: panicState });
+                    break;
+                }
+
+                case 'catbalou': {
+                    const hasCards =
+                        target.hand.length > 0 || target.inPlay.length > 0;
+                    if (!hasCards) {
+                        const s = structuredClone(GRef.current);
+                        s.log = [
+                            `${target.name} has no cards.`,
+                            ...s.log,
+                        ].slice(0, 25);
+                        dispatch({ type: 'SET_STATE', state: s });
+                        return;
+                    }
+                    await floatCard(
+                        'catbalou',
+                        getPlayerEl(0),
+                        getPlayerEl(targetId),
+                    );
+
+                    const picked = await waitForCardPick(
+                        GRef.current,
+                        targetId,
+                        `🃏 Cat Balou — choose a card to discard from ${target.name}`,
+                        dispatch,
+                    );
+
+                    const catState = structuredClone(GRef.current);
+                    const t = catState.players[targetId];
+                    if (picked.source === 'hand') {
+                        t.hand.splice(picked.idx, 1);
+                    } else {
+                        t.inPlay.splice(picked.idx, 1);
+                    }
+                    catState.discardPile.push(picked.key);
+                    await popupOnPlayer(
+                        targetId,
+                        picked.key,
+                        `${picked.key}-pop`,
+                    );
+                    catState.log = [
+                        `You discard ${CARD_DEFS[picked.key]?.name || picked.key} from ${target.name}!`,
+                        ...catState.log,
+                    ].slice(0, 25);
+                    dispatch({ type: 'SET_STATE', state: catState });
+                    break;
+                }
+
+                case 'duel': {
+                    await floatCard(
+                        'duel',
+                        getPlayerEl(0),
+                        getPlayerEl(targetId),
+                    );
+                    await showBanner(
+                        `You challenge ${target.name} to a Duel! ⚔️`,
+                        900,
+                    );
+                    const afterDuel = await resolveDuel(
+                        GRef.current,
+                        0,
+                        targetId,
+                        flashMapRef.current,
+                        dispatch,
+                    );
+                    dispatch({ type: 'SET_STATE', state: afterDuel });
+                    break;
+                }
+            }
+
+            // check win after any targeted action
+            const afterAction = checkWin(GRef.current);
+            if (afterAction.over) {
+                dispatch({ type: 'SET_STATE', state: afterAction });
+            }
+        },
+        [dispatch, flashMapRef],
+    );
 
     const handleAsyncCard = useCallback(
         async (cardKey: CardKey) => {
             // remove card from hand first
             const newState = structuredClone(GRef.current);
             const p = newState.players[0];
-            p.hand.splice(newState.selectedCard!, 1);
+            const cardIdx = p.hand.indexOf(cardKey);
+            if (cardIdx < 0) return;
+            p.hand.splice(cardIdx, 1);
             newState.selectedCard = null;
-            newState.discardPile.push(cardKey);
+
+            const isBlue = CARD_DEFS[cardKey].color === 'blue';
+
+            if (!isBlue) newState.discardPile.push(cardKey);
             dispatch({ type: 'SET_STATE', state: newState });
 
             switch (cardKey) {
@@ -131,13 +337,14 @@ export default function App() {
                             getPlayerEl(0),
                             getPlayerEl(q.id),
                         );
-                        // checkMissed needs to dispatch too — see below
-                        await checkMissed(
+                        const source = GRef.current.players[0];
+                        const newState = await checkMissed(
                             GRef.current,
                             q,
-                            p,
+                            source,
                             flashMapRef.current,
                         );
+                        dispatch({ type: 'SET_STATE', state: newState });
                         if (GRef.current.over) break;
                     }
                     break;
@@ -151,26 +358,15 @@ export default function App() {
                             getPlayerEl(0),
                             getPlayerEl(q.id),
                         );
-                        const bi =
-                            GRef.current.players[q.id].hand.indexOf('bang');
-                        if (bi >= 0) {
-                            const s = structuredClone(GRef.current);
-                            s.players[q.id].hand.splice(bi, 1);
-                            s.discardPile.push('bang');
-                            s.log = [
-                                `${q.name} plays BANG! to dodge.`,
-                                ...s.log,
-                            ].slice(0, 25);
-                            dispatch({ type: 'SET_STATE', state: s });
-                            await popupOnPlayer(q.id, 'bang', 'bang-pop');
-                        } else {
-                            await checkBang(
-                                GRef.current,
-                                q,
-                                p,
-                                flashMapRef.current,
-                            );
-                        }
+                        const source = GRef.current.players[0];
+                        const newState = await checkBang(
+                            GRef.current,
+                            q,
+                            source,
+                            flashMapRef.current,
+                        );
+                        dispatch({ type: 'SET_STATE', state: newState });
+
                         if (GRef.current.over) break;
                     }
                     break;
@@ -178,6 +374,87 @@ export default function App() {
                 case 'generalstore': {
                     await showBanner('You play General Store! 🏪', 900);
                     await handlePlayGeneralStore();
+                    break;
+                }
+                case 'stagecoach': {
+                    await Promise.all([
+                        popupOnPlayer(0, 'stagecoach', 'stagecoach-pop'),
+                        showBanner('You play Stagecoach! 🃏🃏', 900),
+                    ]);
+                    const { cards, state: afterDraw } = dealN(GRef.current, 2);
+                    afterDraw.players[0].hand.push(...cards);
+                    afterDraw.log = [
+                        'You play Stagecoach! Drew 2 cards.',
+                        ...afterDraw.log,
+                    ].slice(0, 25);
+                    dispatch({ type: 'SET_STATE', state: afterDraw });
+                    break;
+                }
+
+                case 'wellsfargo': {
+                    await Promise.all([
+                        popupOnPlayer(0, 'wellsfargo', 'wellsfargo-pop'),
+                        showBanner('You play Wells Fargo! 🃏🃏🃏', 900),
+                    ]);
+                    const { cards, state: afterDraw } = dealN(GRef.current, 3);
+                    afterDraw.players[0].hand.push(...cards);
+                    afterDraw.log = [
+                        'You play Wells Fargo! Drew 3 cards.',
+                        ...afterDraw.log,
+                    ].slice(0, 25);
+                    dispatch({ type: 'SET_STATE', state: afterDraw });
+                    break;
+                }
+                case 'beer': {
+                    if (
+                        GRef.current.players.filter((q) => q.alive).length <= 2
+                    ) {
+                        const s = structuredClone(GRef.current);
+                        s.log = [
+                            'Beer has no effect with 2 players left.',
+                            ...s.log,
+                        ].slice(0, 25);
+                        dispatch({ type: 'SET_STATE', state: s });
+                        break;
+                    }
+                    await popupOnPlayer(0, 'beer', 'beer-pop');
+                    await showBanner('You drink Beer! 🍺', 800);
+                    const beerState = structuredClone(GRef.current);
+                    beerState.players[0].hp = Math.min(
+                        beerState.players[0].maxHp,
+                        beerState.players[0].hp + 1,
+                    );
+                    beerState.log = [
+                        `You drink Beer → ${beerState.players[0].hp}/${beerState.players[0].maxHp} HP.`,
+                        ...beerState.log,
+                    ].slice(0, 25);
+                    dispatch({ type: 'SET_STATE', state: beerState });
+                    break;
+                }
+
+                case 'mustang': {
+                    await popupOnPlayer(0, 'mustang', 'mustang-pop');
+                    await showBanner('You play Mustang! 🐴', 800);
+                    const mustangState = structuredClone(GRef.current);
+                    mustangState.players[0].inPlay.push('mustang');
+                    mustangState.log = [
+                        'You play Mustang! Others see you as 1 further away.',
+                        ...mustangState.log,
+                    ].slice(0, 25);
+                    dispatch({ type: 'SET_STATE', state: mustangState });
+                    break;
+                }
+
+                case 'scope': {
+                    await popupOnPlayer(0, 'scope', 'scope-pop');
+                    await showBanner('You play Scope! 🔭', 800);
+                    const scopeState = structuredClone(GRef.current);
+                    scopeState.players[0].inPlay.push('scope');
+                    scopeState.log = [
+                        'You play Scope! You view others at distance -1.',
+                        ...scopeState.log,
+                    ].slice(0, 25);
+                    dispatch({ type: 'SET_STATE', state: scopeState });
                     break;
                 }
             }
@@ -199,10 +476,14 @@ export default function App() {
 
         // sync cards — go through reducer
         dispatch({ type: 'PLAY_CARD' });
-    }, [G.selectedCard, handleAsyncCard, human.hand]);
+    }, [G.selectedCard, handleAsyncCard, human.hand, dispatch]);
 
     const handleEndTurn = useCallback(() => {
         dispatch({ type: 'END_TURN' });
+    }, [dispatch]);
+
+    const restartGame = useCallback(() => {
+        dispatch({ type: 'SET_STATE', state: initGame() });
     }, [dispatch]);
 
     return (
@@ -259,6 +540,8 @@ export default function App() {
                 }
                 onEndTurn={handleEndTurn}
             />
+            <GameLog log={G.log} />
+            <GameOverDialog G={G} onPlayAgain={restartGame} />
         </div>
     );
 }
