@@ -85,26 +85,26 @@ function refillDeck() {
 }
 
 function checkWin() {
-    const sheriff = G.players.find((p) => p.role === 'sheriff');
+    const sheriff = G.players.find((p) => p.role === 'SHERIFF');
     if (sheriff && !sheriff.alive) {
-        const renegade = G.players.find((p) => p.role === 'renegade');
+        const renegade = G.players.find((p) => p.role === 'RENEGADE');
         const aliveOutlaws = G.players.filter(
-            (p) => p.role === 'outlaw' && p.alive,
+            (p) => p.role === 'OUTLAW' && p.alive,
         );
         G.over = true;
         G.winner =
             aliveOutlaws.length === 0 && renegade && !renegade.alive
-                ? 'renegade_solo'
-                : 'outlaws';
+                ? 'RENEGADE'
+                : 'OUTLAW';
         return;
     }
     if (
         G.players
-            .filter((p) => p.role === 'outlaw' || p.role === 'renegade')
+            .filter((p) => p.role === 'OUTLAW' || p.role === 'RENEGADE')
             .every((p) => !p.alive)
     ) {
         G.over = true;
-        G.winner = 'sheriff';
+        G.winner = 'SHERIFF';
     }
 }
 
@@ -124,7 +124,7 @@ function applyDamage(targetId: number, amount: number, sourceId: number) {
         t.hand = [];
         t.inPlay = [];
 
-        if (t.role === 'outlaw') {
+        if (t.role === 'OUTLAW') {
             const killer = G.players[sourceId];
             if (killer) {
                 killer.hand.push(...dealN(G.deck, 3));
@@ -132,8 +132,8 @@ function applyDamage(targetId: number, amount: number, sourceId: number) {
                 addLog(`${killer.name} draws 3 bonus cards!`);
             }
         }
-        if (t.role === 'deputy') {
-            const si = G.players.findIndex((p) => p.role === 'sheriff');
+        if (t.role === 'DEPUTY') {
+            const si = G.players.findIndex((p) => p.role === 'SHERIFF');
             if (sourceId === si) {
                 G.discardPile.push(...G.players[si].hand);
                 debugCardCount();
@@ -166,10 +166,10 @@ function applyDodge(targetId: number) {
 function isEnemy(from: number, to: number) {
     const f = G.players[from],
         t = G.players[to];
-    if (f.role === 'sheriff' || f.role === 'deputy')
-        return t.role === 'outlaw' || t.role === 'renegade';
-    if (f.role === 'outlaw') return t.role === 'sheriff' || t.role === 'deputy';
-    return t.role !== 'renegade';
+    if (f.role === 'SHERIFF' || f.role === 'DEPUTY')
+        return t.role === 'OUTLAW' || t.role === 'RENEGADE';
+    if (f.role === 'OUTLAW') return t.role === 'SHERIFF' || t.role === 'DEPUTY';
+    return t.role !== 'RENEGADE';
 }
 
 function nextTurn() {
@@ -1392,9 +1392,9 @@ function showGameOver() {
     const modal = document.getElementById('modal-content');
     if (!overlay || !modal) return;
     const msgs = {
-        sheriff: '🌟 Sheriff & Deputies Win!',
-        outlaws: '💀 Outlaws Win! Sheriff eliminated.',
-        renegade_solo: '🎭 Renegade Wins!',
+        SHERIFF: '🌟 Sheriff & Deputies Win!',
+        OUTLAW: '💀 Outlaws Win! Sheriff eliminated.',
+        RENEGADE: '🎭 Renegade Wins!',
     };
     const msgsDis = G.winner ? msgs[G.winner] : 'Game over.';
     const rows = G.players

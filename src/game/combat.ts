@@ -6,28 +6,28 @@ import { dealN } from './helpers';
 // ── Check win condition ─────────────────────────────────────────
 export function checkWin(state: GameState): GameState {
     const newState = { ...state };
-    const sheriff = newState.players.find((p) => p.role === 'sheriff');
+    const sheriff = newState.players.find((p) => p.role === 'SHERIFF');
 
     if (sheriff && !sheriff.alive) {
-        const renegade = newState.players.find((p) => p.role === 'renegade');
+        const renegade = newState.players.find((p) => p.role === 'RENEGADE');
         const aliveOutlaws = newState.players.filter(
-            (p) => p.role === 'outlaw' && p.alive,
+            (p) => p.role === 'OUTLAW' && p.alive,
         );
         newState.over = true;
         newState.winner =
             aliveOutlaws.length === 0 && renegade && !renegade.alive
-                ? 'renegade_solo'
-                : 'outlaws';
+                ? 'RENEGADE'
+                : 'OUTLAW';
         return newState;
     }
 
     if (
         newState.players
-            .filter((p) => p.role === 'outlaw' || p.role === 'renegade')
+            .filter((p) => p.role === 'OUTLAW' || p.role === 'RENEGADE')
             .every((p) => !p.alive)
     ) {
         newState.over = true;
-        newState.winner = 'sheriff';
+        newState.winner = 'SHERIFF';
     }
 
     return newState;
@@ -63,7 +63,7 @@ export function applyDamage(
         t.hand = [];
         t.inPlay = [];
 
-        if (t.role === 'outlaw') {
+        if (t.role === 'OUTLAW') {
             const { cards, state: afterDraw } = dealN(newState, 3);
             newState = afterDraw;
             newState.players[sourceId].hand.push(...cards);
@@ -73,8 +73,8 @@ export function applyDamage(
             ].slice(0, 25);
         }
 
-        if (t.role === 'deputy') {
-            const si = newState.players.findIndex((p) => p.role === 'sheriff');
+        if (t.role === 'DEPUTY') {
+            const si = newState.players.findIndex((p) => p.role === 'SHERIFF');
             if (sourceId === si) {
                 newState.discardPile.push(...newState.players[si].hand);
                 newState.players[si].hand = [];

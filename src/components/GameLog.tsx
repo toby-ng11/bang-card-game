@@ -1,17 +1,10 @@
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useEffect, useRef } from 'react';
 
 interface Props {
     log: string[];
 }
 
 export default function GameLog({ log }: Props) {
-    const bottomRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [log]);
-
     return (
         <ScrollArea className="h-32 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-700 dark:bg-gray-900">
             <div className="flex flex-col gap-0.5">
@@ -28,7 +21,6 @@ export default function GameLog({ log }: Props) {
                     </div>
                 ))}
             </div>
-            <div ref={bottomRef} />
         </ScrollArea>
     );
 }

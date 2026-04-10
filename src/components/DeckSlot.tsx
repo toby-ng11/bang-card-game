@@ -8,7 +8,7 @@ interface DeckSlotProps {
 }
 
 export default function DeckSlot({ deck, discardPile }: DeckSlotProps) {
-    const top = discardPile[discardPile.length - 1];
+    const top = discardPile[0];
     const c = top ? CARD_DEFS[top] : null;
 
     return (

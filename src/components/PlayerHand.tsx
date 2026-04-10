@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 
 interface PlayerHandProps {
     hand: CardKey[];
+    currentLP: number;
     selectedCard: number | null;
     discardingToEndTurn: boolean;
     onCardClick: (idx: number) => void;
@@ -12,6 +13,7 @@ interface PlayerHandProps {
 
 export default function PlayerHand({
     hand,
+    currentLP,
     selectedCard,
     discardingToEndTurn,
     onCardClick,
@@ -21,15 +23,15 @@ export default function PlayerHand({
             <div className="mb-2 text-center text-xs font-medium tracking-wide text-gray-500 uppercase">
                 {discardingToEndTurn ? (
                     <span className="text-red-500 normal-case">
-                        Discard {hand.length} card(s) to end your turn — click a
-                        card to discard it
+                        Discard {hand.length - currentLP} card(s) to end your
+                        turn — click a card to discard it
                     </span>
                 ) : (
                     'Your Hand'
                 )}
             </div>
 
-            <div className="flex flex-wrap justify-center gap-4">
+            <div className="m-auto flex max-w-150 flex-wrap justify-center gap-4">
                 {hand.length === 0 && (
                     <span className="text-sm text-gray-500">No cards.</span>
                 )}

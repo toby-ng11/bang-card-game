@@ -19,10 +19,10 @@ interface PlayerSlotProps {
 const roleVariants = cva('text-[10px] font-medium px-[7px] py-[2px] ml-1', {
     variants: {
         role: {
-            sheriff: 'bg-[#faeeda] text-[#633806] border-transparent',
-            deputy: 'bg-[#e6f1fb] text-[#042c53] border-transparent',
-            outlaw: 'bg-[#fcebeb] text-[#501313] border-transparent',
-            renegade: 'bg-[#eeedfe] text-[#26215c] border-transparent',
+            SHERIFF: 'bg-[#faeeda] text-[#633806] border-transparent',
+            DEPUTY: 'bg-[#e6f1fb] text-[#042c53] border-transparent',
+            OUTLAW: 'bg-[#fcebeb] text-[#501313] border-transparent',
+            RENEGADE: 'bg-[#eeedfe] text-[#26215c] border-transparent',
         },
     },
 });
@@ -48,7 +48,7 @@ export default function PlayerSlot({
         (canTargetAllPlayers ? true : inRange(players, human.id, p.id));
 
     const isCur = p.id === turn;
-    const showRole = p.role === 'sheriff' || !p.alive || p.isHuman;
+    const showRole = p.role === 'SHERIFF' || !p.alive || p.isHuman;
     const roleLabel = showRole ? p.role : 'unknown';
     const dist = p.isHuman ? 0 : distance(players, 0, p.id);
 

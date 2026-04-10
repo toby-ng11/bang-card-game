@@ -1,17 +1,13 @@
 import { CARD_DEFS } from '@/definitions/cards';
 import { CardKey } from '@/types';
+import { toast } from 'sonner';
 
 function showBanner(text: string, duration = 1100): Promise<void> {
-    const b = document.getElementById('action-banner');
-    if (!b) return Promise.resolve();
-    b.textContent = text;
-    b.style.opacity = '1';
-    return new Promise((res) =>
-        setTimeout(() => {
-            b.style.opacity = '0';
-            setTimeout(res, 200);
-        }, duration),
-    );
+    toast(text, {
+        duration,
+        position: 'top-center',
+    });
+    return wait(duration);
 }
 
 function popupOnPlayer(

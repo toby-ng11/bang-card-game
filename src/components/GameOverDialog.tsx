@@ -16,18 +16,18 @@ interface Props {
 }
 
 const WINNER_MESSAGES: Record<NonNullable<Winner>, string> = {
-    sheriff: '🌟 Sheriff & Deputies Win!',
-    outlaws: '💀 Outlaws Win! Sheriff eliminated.',
-    renegade_solo: '🎭 Renegade Wins!',
+    SHERIFF: '🌟 Sheriff & Deputies Win!',
+    OUTLAW: '💀 Outlaws Win! Sheriff eliminated.',
+    RENEGADE: '🎭 Renegade Wins!',
 };
 
 const roleBadgeVariants = cva('text-[10px] font-medium px-2 py-0.5 rounded', {
     variants: {
         role: {
-            sheriff: 'bg-[#FAEEDA] text-[#633806]',
-            deputy: 'bg-[#E6F1FB] text-[#042C53]',
-            outlaw: 'bg-[#FCEBEB] text-[#501313]',
-            renegade: 'bg-[#EEEDFE] text-[#26215C]',
+            SHERIFF: 'bg-[#FAEEDA] text-[#633806]',
+            DEPUTY: 'bg-[#E6F1FB] text-[#042C53]',
+            OUTLAW: 'bg-[#FCEBEB] text-[#501313]',
+            RENEGADE: 'bg-[#EEEDFE] text-[#26215C]',
         } satisfies Record<Role, string>,
     },
 });
