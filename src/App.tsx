@@ -52,7 +52,7 @@ export default function App() {
                 return;
 
             if (G.discardingToEndTurn) {
-                dispatch({ type: 'DISCARD_CARD_FROM_HAND', idx: i });
+                dispatch({ type: 'DISCARD_TO_END_TURN', idx: i });
                 return;
             }
 
@@ -173,15 +173,41 @@ export default function App() {
 
     useEffect(() => {
         const reactor = G.players.find((p) => p.id === G.reactorId[0]);
+        console.log(G.reactorId);
 
-        if (G.phase === 'reaction' && reactor && !reactor.isHuman) {
+        if (G.phase === 'dying' && reactor && !reactor.isHuman) {
+            const aiDelay = setTimeout(() => {
+                const hasBeer = reactor.hand.includes('beer');
+
+                if (hasBeer) {
+                    // AI chugs a beer
+                    triggerPopup(reactor.id, 'beer', 'heal');
+                    dispatch({
+                        type: 'DRINK_BEER_TO_SURVIVE',
+                        playerId: reactor.id,
+                        prevPhase: G.pendingAction?.type
+                            ? G.pendingAction?.type
+                            : 'play',
+                    });
+                } else {
+                    // No more beers and HP <= 0? Dead.
+                    dispatch({
+                        type: 'TAKE_DAMAGE',
+                        sourceId: G.pendingAction?.sourceId ?? null,
+                        targetId: reactor.id,
+                        damageAmount: 999,
+                    });
+                }
+            }, 1000); // 1 second between beers for dramatic effect
+
+            return () => clearTimeout(aiDelay);
+        }
+
+        if (G.phase === 'bang' && reactor && !reactor.isHuman) {
             const aiDelay = setTimeout(async () => {
                 const hasMissed = reactor.hand.includes('missed');
                 if (hasMissed) {
-                    await showBanner(
-                        `${reactor.name} plays a Missed! and dodge.`,
-                        900,
-                    );
+                    triggerPopup(reactor.id, 'missed', 'play');
                     dispatch({
                         type: 'PLAY_CARD',
                         cardKey: 'missed',
@@ -189,7 +215,7 @@ export default function App() {
                         targetId: G.pendingAction?.targetId ?? null,
                     });
                 } else {
-                    await showBanner(`${reactor.name} took 1 damage!`, 900);
+                    triggerPopup(reactor.id, 'bang', 'damage');
                     dispatch({
                         type: 'TAKE_DAMAGE',
                         sourceId: G.pendingAction?.sourceId ?? null,
@@ -202,7 +228,7 @@ export default function App() {
             return () => clearTimeout(aiDelay);
         }
 
-        if (G.phase === 'reaction-gatling' && reactor && !reactor.isHuman) {
+        if (G.phase === 'gatling' && reactor && !reactor.isHuman) {
             const aiDelay = setTimeout(() => {
                 const hasMissed = reactor.hand.includes('missed');
 
@@ -211,18 +237,52 @@ export default function App() {
                     triggerPopup(reactor.id, 'missed', 'play');
 
                     dispatch({
-                        type: 'RESOLVE_GATLING',
-                        payload: { playerId: reactor.id, dodged: true },
+                        type: 'PLAY_CARD',
+                        cardKey: 'missed',
+                        sourceId: reactor.id,
+                        targetId: G.pendingAction?.targetId ?? null,
                     });
                 } else {
                     // Take damage popup
                     triggerPopup(reactor.id, 'gatling', 'damage');
 
                     dispatch({
-                        type: 'RESOLVE_GATLING',
-                        payload: { playerId: reactor.id, dodged: false },
+                        type: 'TAKE_DAMAGE',
+                        sourceId: G.pendingAction?.sourceId ?? null,
+                        targetId: reactor.id,
+                        damageAmount: 2,
                     });
                 }
+                dispatch({ type: 'FINISH_ACTION' });
+            }, 1000);
+            return () => clearTimeout(aiDelay);
+        }
+
+        if (G.phase === 'indians' && reactor && !reactor.isHuman) {
+            const aiDelay = setTimeout(() => {
+                const hasBang = reactor.hand.includes('bang');
+
+                if (hasBang) {
+                    // Trigger your beautiful popup!
+                    triggerPopup(reactor.id, 'bang', 'play');
+
+                    dispatch({
+                        type: 'RESOLVE_INDIANS',
+                        playerId: reactor.id,
+                    });
+                } else {
+                    // Take damage popup
+                    triggerPopup(reactor.id, 'indians', 'damage');
+
+                    dispatch({
+                        type: 'TAKE_DAMAGE',
+                        sourceId: G.pendingAction?.sourceId ?? null,
+                        targetId: reactor.id,
+                        damageAmount: 1,
+                    });
+                }
+
+                dispatch({ type: 'FINISH_ACTION' });
             }, 1000);
             return () => clearTimeout(aiDelay);
         }
@@ -230,7 +290,7 @@ export default function App() {
         const currentPickerId = G.generalStoreOrder?.[G.generalStoreIndex];
         const currentPicker = G.players.find((p) => p.id === currentPickerId);
         if (
-            G.phase === 'picking-card-general-store' &&
+            G.phase === 'generalstore' &&
             currentPicker &&
             !currentPicker.isHuman
         ) {
@@ -262,6 +322,7 @@ export default function App() {
         G.phase,
         G.reactorId,
         G.players,
+        G.pendingAction?.type,
         G.pendingAction?.sourceId,
         G.pendingAction?.targetId,
         G.generalStoreCards,
@@ -294,16 +355,15 @@ export default function App() {
                 flashMap={flashMapRef.current}
                 onPlayerClick={handlePlayerClick}
             />
-            {G.phase === 'picking-card-general-store' &&
-                G.generalStorePicking && (
-                    <GeneralStorePicker
-                        key="general-store-active"
-                        cards={G.generalStoreCards}
-                        pickerName={currentPicker?.name || 'Unknown'}
-                        isHumanPicking={isHumanTurnToPick}
-                        onPick={handleGeneralStorePick}
-                    />
-                )}
+            {G.phase === 'generalstore' && G.generalStorePicking && (
+                <GeneralStorePicker
+                    key="general-store-active"
+                    cards={G.generalStoreCards}
+                    pickerName={currentPicker?.name || 'Unknown'}
+                    isHumanPicking={isHumanTurnToPick}
+                    onPick={handleGeneralStorePick}
+                />
+            )}
 
             {G.cardPickerPicking && G.cardPickerTarget !== null && (
                 <CardPicker

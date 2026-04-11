@@ -54,16 +54,22 @@ function initGame(): GameState {
         // Testing Hack: Ensure human always has General Store
         if (isHuman) {
             // Replace the last card with generalstore (or just push it)
-            initialHand[0] = 'gatling';
+            initialHand[0] = 'indians';
+            initialHand[1] = 'gatling';
         }
-
         return {
             id: i,
             name: names[i],
             role,
-            hp: role === 'SHERIFF' ? 5 : 4,
+            hp: role === 'SHERIFF' ? 5 : 1,
             maxHp: role === 'SHERIFF' ? 5 : 4,
-            hand: initialHand,
+            hand:
+                names[i] === 'Billy'
+                    ? ['beer', 'beer', 'beer']
+                    : names[i] === 'Rosa'
+                      ? ['beer']
+                      : initialHand,
+
             alive: true,
             isHuman,
             inPlay: [],

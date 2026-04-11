@@ -30,13 +30,10 @@ export type Role = 'SHERIFF' | 'DEPUTY' | 'OUTLAW' | 'RENEGADE';
 export type Phase =
     | 'draw'
     | 'play'
-    | 'picking-card'
-    | 'picking-card-general-store'
-    | 'reaction'
-    | 'reaction-gatling'
     | 'dying'
     | 'game-over'
-    | 'check-win';
+    | 'check-win'
+    | CardKey;
 
 export type Winner = 'SHERIFF' | 'OUTLAW' | 'RENEGADE' | null;
 
