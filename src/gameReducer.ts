@@ -680,8 +680,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ),
                         discardPile: [cardKey, ...state.discardPile],
                         phase: state.phase === 'bang' ? 'play' : 'gatling', //continue, let RESOLVE_GATLING handle phase
-                        pendingAction:
-                            state.phase === 'bang' ? null : state.pendingAction,
                         reactorId: newReactors,
                         log: [
                             `${state.players[sourceId].name} played a Missed! and dodge the shot!`,

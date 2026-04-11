@@ -198,6 +198,8 @@ export default function App() {
                         damageAmount: 999,
                     });
                 }
+
+                dispatch({ type: 'FINISH_ACTION' });
             }, 1000); // 1 second between beers for dramatic effect
 
             return () => clearTimeout(aiDelay);
@@ -223,6 +225,7 @@ export default function App() {
                         damageAmount: 1,
                     });
                 }
+                dispatch({ type: 'FINISH_ACTION' });
             }, 1000);
 
             return () => clearTimeout(aiDelay);
@@ -250,7 +253,7 @@ export default function App() {
                         type: 'TAKE_DAMAGE',
                         sourceId: G.pendingAction?.sourceId ?? null,
                         targetId: reactor.id,
-                        damageAmount: 2,
+                        damageAmount: 1,
                     });
                 }
                 dispatch({ type: 'FINISH_ACTION' });
