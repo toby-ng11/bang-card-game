@@ -57,7 +57,7 @@ export default function PlayerSlot({
             data-pid={p.id}
             onClick={() => onPlayerClick(p.id)}
             className={cn(
-                'player-row relative flex cursor-pointer flex-col rounded-lg border border-black/20 px-3 py-2 transition duration-300 ease-in-out hover:border-black',
+                'player-row relative flex cursor-pointer flex-col rounded-lg border border-amber-800/50 bg-black/20 px-3 py-2 transition duration-300 ease-in-out hover:border-amber-600',
                 !p.alive && 'dead',
                 targeting &&
                     (isClickTarget
@@ -85,7 +85,7 @@ export default function PlayerSlot({
                     {isCur && <span className="text-blue-400">◀</span>}
                     {!p.isHuman && p.alive && (
                         <Badge
-                            variant="outline"
+                            variant="secondary"
                             className="size-4 rounded-full p-2"
                         >
                             {dist}

@@ -1,6 +1,5 @@
 import ActionButtons from '@/components/ActionButtons';
 import CardPicker from '@/components/CardPicker';
-import DistanceMap from '@/components/DistanceMap';
 import GameOverDialog from '@/components/GameOverDialog';
 import GameTable from '@/components/GameTable';
 import GeneralStorePicker from '@/components/GeneralStorePicker';
@@ -15,8 +14,9 @@ import { distance, inRange } from '@/game/helpers';
 import { initGame } from '@/game/init';
 import { gameReducer } from '@/gameReducer';
 import { CardKey, CardPick, FlashMap } from '@/types';
+import { AnimatePresence } from 'motion/react';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
-import GameLog from './components/GameLog';
+import { BattleLogPanel } from './components/GameLogPanel';
 import PopupLayer from './components/PopupLayer';
 
 export default function App() {
@@ -48,8 +48,10 @@ export default function App() {
 
     const handleCardClick = useCallback(
         (i: number) => {
-            if (!G.players[G.turn].isHuman || G.phase !== 'play' || G.targeting)
-                return;
+            const isMyTurn = G.players[G.turn].isHuman && G.phase === 'play';
+            const isMyTurnToReact = G.reactorId[0] === 0;
+
+            if ((!isMyTurn && !isMyTurnToReact) || G.targeting) return;
 
             if (G.discardingToEndTurn) {
                 dispatch({ type: 'DISCARD_TO_END_TURN', idx: i });
@@ -173,7 +175,6 @@ export default function App() {
 
     useEffect(() => {
         const reactor = G.players.find((p) => p.id === G.reactorId[0]);
-        console.log(G.reactorId);
 
         if (G.phase === 'dying' && reactor && !reactor.isHuman) {
             const aiDelay = setTimeout(() => {
@@ -290,6 +291,35 @@ export default function App() {
             return () => clearTimeout(aiDelay);
         }
 
+        if (G.phase === 'duel' && reactor && !reactor.isHuman) {
+            const aiDelay = setTimeout(() => {
+                const hasBang = reactor.hand.includes('bang');
+
+                if (hasBang) {
+                    // Trigger your beautiful popup!
+                    triggerPopup(reactor.id, 'bang', 'play');
+
+                    dispatch({
+                        type: 'RESOLVE_DUEL',
+                        playerId: reactor.id,
+                    });
+                } else {
+                    // Take damage popup
+                    triggerPopup(reactor.id, 'duel', 'damage');
+
+                    dispatch({
+                        type: 'TAKE_DAMAGE',
+                        sourceId: G.pendingAction?.sourceId ?? null,
+                        targetId: reactor.id,
+                        damageAmount: 1,
+                    });
+                }
+
+                dispatch({ type: 'FINISH_ACTION' });
+            }, 1000);
+            return () => clearTimeout(aiDelay);
+        }
+
         const currentPickerId = G.generalStoreOrder?.[G.generalStoreIndex];
         const currentPicker = G.players.find((p) => p.id === currentPickerId);
         if (
@@ -334,68 +364,136 @@ export default function App() {
     ]);
 
     console.log(G.discardPile);
+    console.log(G.reactorId);
 
     return (
-        <div id="game" className="flex flex-col gap-4 p-4">
-            <div
-                id="float-card"
-                className="pointer-events-none fixed z-50 flex h-18 w-13 flex-col items-center justify-center rounded-md border border-gray-300 bg-white text-[10px] font-medium opacity-0"
-            >
-                <div className="fi text-xl" />
-                <div id="fc-name" className="text-[9px]" />
-            </div>
-            <div
-                id="action-banner"
-                className="pointer-events-none fixed top-14 left-1/2 z-40 -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-5 py-2 text-[13px] font-medium whitespace-nowrap opacity-0 transition-opacity duration-200"
-            />
+        <div
+            id="game"
+            className="relative min-h-screen w-full overflow-hidden bg-[#1a0f0a] font-sans text-stone-200"
+        >
+            <div className="pointer-events-none absolute inset-0 bg-[url('/wood-texture.png')] opacity-20 mix-blend-overlay" />
+            <div className="bg-radial-gradient(circle_at_center, transparent 0%, rgba(0,0,0,0.4) 100%) absolute inset-0" />
 
             <PopupLayer activePopups={G.activePopups} />
-            <RoleBanner human={human} />
-            <DistanceMap players={G.players} />
-            <PhaseBar G={G} />
-            <GameTable
-                G={G}
-                flashMap={flashMapRef.current}
-                onPlayerClick={handlePlayerClick}
-            />
-            {G.phase === 'generalstore' && G.generalStorePicking && (
-                <GeneralStorePicker
-                    key="general-store-active"
-                    cards={G.generalStoreCards}
-                    pickerName={currentPicker?.name || 'Unknown'}
-                    isHumanPicking={isHumanTurnToPick}
-                    onPick={handleGeneralStorePick}
-                />
-            )}
 
-            {G.cardPickerPicking && G.cardPickerTarget !== null && (
-                <CardPicker
-                    target={G.players[G.cardPickerTarget]}
-                    label={G.cardPickerLabel}
-                    onPick={(picked) => handleCardPickerPick(picked)}
-                />
-            )}
-            <PlayerHand
-                hand={human.hand}
-                currentLP={human.hp}
-                selectedCard={G.selectedCard}
-                discardingToEndTurn={G.discardingToEndTurn}
-                onCardClick={handleCardClick}
-            />
-            <ActionButtons
-                G={G}
-                human={human}
-                onDraw={handleDraw}
-                onTargetPlayer={() =>
-                    dispatch({ type: 'SET_TARGETING', targeting: true })
-                }
-                onPlayCard={handlePlayCard}
-                onCancelTarget={() =>
-                    dispatch({ type: 'SET_TARGETING', targeting: false })
-                }
-                onEndTurn={handleEndTurn}
-            />
-            <GameLog log={G.log} />
+            <header className="fixed top-0 right-0 left-0 z-30 flex items-center justify-between bg-linear-to-b from-black/60 to-transparent p-4">
+                <RoleBanner human={human} />
+                <div className="flex flex-col items-center gap-2">
+                    <PhaseBar G={G} />
+                    {/*<DistanceMap players={G.players} />*/}
+                </div>
+                <div className="flex gap-2">
+                    {/* Quick Settings or Menu buttons could go here */}
+                </div>
+            </header>
+
+            <main className="relative flex h-screen flex-col items-center justify-center px-4 pt-32 pb-64">
+                <div className="relative flex aspect-video w-full max-w-6xl items-center justify-center rounded-[100px] border-4 border-amber-900/20 bg-[#2a1810]/40 p-12 shadow-[inset_0_0_100px_rgba(0,0,0,0.5)]">
+                    <GameTable
+                        G={G}
+                        flashMap={flashMapRef.current}
+                        onPlayerClick={handlePlayerClick}
+                    />
+
+                    <AnimatePresence>
+                        {G.phase === 'generalstore' && (
+                            <div className="absolute inset-0 z-40 flex items-center justify-center rounded-[100px] backdrop-blur-md">
+                                <GeneralStorePicker
+                                    key="general-store-active"
+                                    cards={G.generalStoreCards}
+                                    pickerName={
+                                        currentPicker?.name || 'Unknown'
+                                    }
+                                    isHumanPicking={isHumanTurnToPick}
+                                    onPick={handleGeneralStorePick}
+                                />
+                            </div>
+                        )}
+
+                        {G.cardPickerPicking && G.cardPickerTarget !== null && (
+                            <div className="absolute inset-0 z-40 flex items-center justify-center rounded-[100px] backdrop-blur-md">
+                                <CardPicker
+                                    target={G.players[G.cardPickerTarget]}
+                                    label={G.cardPickerLabel}
+                                    onPick={(picked) =>
+                                        handleCardPickerPick(picked)
+                                    }
+                                />
+                            </div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </main>
+
+            <BattleLogPanel log={G.log} />
+
+            <footer className="fixed right-0 bottom-0 left-0 z-30 bg-linear-to-t from-black/90 via-black/60 to-transparent px-8 pt-20 pb-6">
+                <div className="mx-auto flex max-w-7xl items-end gap-10">
+                    {/* Action Buttons Column */}
+                    <div className="mb-2 flex min-w-55 flex-col gap-3 border-r border-amber-900/30 pr-10">
+                        <div className="px-2">
+                            <h3 className="text-[10px] font-bold tracking-[0.2em] text-amber-500 uppercase opacity-60">
+                                Player Commands
+                            </h3>
+                        </div>
+                        <ActionButtons
+                            G={G}
+                            human={human}
+                            onDraw={handleDraw}
+                            onTargetPlayer={() =>
+                                dispatch({
+                                    type: 'SET_TARGETING',
+                                    targeting: true,
+                                })
+                            }
+                            onPlayCard={handlePlayCard}
+                            onCancelTarget={() =>
+                                dispatch({
+                                    type: 'SET_TARGETING',
+                                    targeting: false,
+                                })
+                            }
+                            onDuelingDiscardBang={() =>
+                                dispatch({
+                                    type: 'RESOLVE_DUEL',
+                                    playerId: human.id,
+                                })
+                            }
+                            onDuelingTakeDamage={() => {
+                                triggerPopup(human.id, 'duel', 'damage');
+                                dispatch({
+                                    type: 'TAKE_DAMAGE',
+                                    sourceId: G.pendingAction?.sourceId ?? null,
+                                    targetId: human.id,
+                                    damageAmount: 1,
+                                });
+
+                                dispatch({ type: 'FINISH_ACTION' });
+                            }}
+                            onEndTurn={handleEndTurn}
+                        />
+                    </div>
+
+                    {/* Hand Container */}
+                    <div className="group relative flex-1">
+                        <div className="absolute -top-6 left-4 rounded-t-lg border-x border-t border-amber-700/50 bg-amber-900/80 px-3 py-1">
+                            <span className="text-[10px] font-bold tracking-widest text-amber-200 uppercase">
+                                Your Hand — {human.hand.length} Cards
+                            </span>
+                        </div>
+                        <div className="rounded-2xl rounded-tl-none border border-amber-900/40 bg-[#1e110b]/60 p-6 shadow-2xl backdrop-blur-md transition-all duration-300 group-hover:border-amber-700/50 group-hover:bg-[#1e110b]/80">
+                            <PlayerHand
+                                hand={human.hand}
+                                currentLP={human.hp}
+                                selectedCard={G.selectedCard}
+                                discardingToEndTurn={G.discardingToEndTurn}
+                                onCardClick={handleCardClick}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </footer>
+
             <GameOverDialog G={G} onPlayAgain={restartGame} />
             <Toaster position="top-center" richColors />
         </div>

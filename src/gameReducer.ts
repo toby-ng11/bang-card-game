@@ -54,17 +54,10 @@ type GameAction =
     | { type: 'DRINK_BEER_TO_SURVIVE'; playerId: number; prevPhase: Phase }
     | { type: 'RESOLVE_CARD_PICK'; payload: CardPick }
     | { type: 'RESOLVE_GENERAL_STORE_PICK'; cardKey: CardKey; playerId: number }
-    | {
-          type: 'RESOLVE_GATLING';
-          payload: { playerId: number };
-      }
-    | {
-          type: 'RESOLVE_INDIANS';
-          playerId: number;
-      }
-    | {
-          type: 'FINISH_ACTION';
-      }
+    | { type: 'RESOLVE_GATLING'; playerId: number }
+    | { type: 'RESOLVE_INDIANS'; playerId: number }
+    | { type: 'RESOLVE_DUEL'; playerId: number }
+    | { type: 'FINISH_ACTION' }
     | {
           type: 'PLAY_CARD';
           cardKey: CardKey;
@@ -423,7 +416,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
 
         case 'RESOLVE_GATLING': {
-            const { playerId } = action.payload;
+            if (state.pendingAction?.type !== 'gatling') return { ...state };
+            const { playerId } = action;
 
             const remainingQueue = removeElementFromArray(
                 playerId,
@@ -439,6 +433,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
 
         case 'RESOLVE_INDIANS': {
+            if (state.pendingAction?.type !== 'indians') return { ...state };
             const { playerId } = action;
 
             const newPlayers = removeCardFromHand('bang', playerId, state);
@@ -455,6 +450,31 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 reactorId: remainingQueue,
                 log: [
                     `${state.players[playerId].name} discard a BANG! and dodge.`,
+                    ...state.log,
+                ],
+            };
+        }
+
+        case 'RESOLVE_DUEL': {
+            if (state.pendingAction?.type !== 'duel') return { ...state };
+            const { playerId } = action;
+
+            const newPlayers = removeCardFromHand('bang', playerId, state);
+
+            const otherDuelist =
+                playerId === state.pendingAction.sourceId
+                    ? state.pendingAction.targetId
+                    : state.pendingAction.sourceId;
+
+            if (otherDuelist === null) return { ...state };
+
+            return {
+                ...state,
+                players: newPlayers,
+                discardPile: ['bang', ...state.discardPile],
+                reactorId: [otherDuelist],
+                log: [
+                    `${state.players[playerId].name} discard a BANG! to stay in the duel.`,
                     ...state.log,
                 ],
             };
@@ -713,7 +733,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ...state,
                         players: newPlayerState,
                         discardPile: [cardKey, ...state.discardPile],
-                        targeting: false,
                         //bangUsed: true, doesnt count as BANG!
                         phase: 'gatling',
                         pendingAction: {
@@ -753,7 +772,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ...state,
                         players: newPlayerState,
                         discardPile: [cardKey, ...state.discardPile],
-                        targeting: false,
                         phase: 'indians',
                         pendingAction: {
                             type: cardKey,
@@ -768,8 +786,35 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     };
                 }
 
-                case 'duel':
-                    return { ...state };
+                case 'duel': {
+                    if (!targetId) return { ...state };
+                    else {
+                        const targetPlayer = state.players[targetId];
+                        const newPlayerState = removeCardFromHand(
+                            cardKey,
+                            sourceId,
+                            state,
+                        );
+
+                        return {
+                            ...state,
+                            players: newPlayerState,
+                            discardPile: [cardKey, ...state.discardPile],
+                            targeting: false,
+                            phase: cardKey,
+                            pendingAction: {
+                                type: cardKey,
+                                sourceId: sourceId,
+                                targetId: targetId,
+                            },
+                            reactorId: [targetId],
+                            log: [
+                                `${sourcePlayer.name} challenges ${targetPlayer.name} to a Duel!`,
+                                ...state.log,
+                            ],
+                        };
+                    }
+                }
 
                 case 'saloon':
                     return { ...state };
