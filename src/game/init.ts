@@ -54,7 +54,7 @@ function initGame(): GameState {
         // Testing Hack: Ensure human always has General Store
         if (isHuman) {
             // Replace the last card with generalstore (or just push it)
-            initialHand[0] = 'duel';
+            initialHand[0] = 'saloon';
         }
         return {
             id: i,

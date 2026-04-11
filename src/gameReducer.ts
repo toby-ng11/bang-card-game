@@ -52,11 +52,13 @@ type GameAction =
           damageAmount: number;
       }
     | { type: 'DRINK_BEER_TO_SURVIVE'; playerId: number; prevPhase: Phase }
+    | { type: 'HEAL_A_PLAYER'; playerId: number; amount: number }
     | { type: 'RESOLVE_CARD_PICK'; payload: CardPick }
     | { type: 'RESOLVE_GENERAL_STORE_PICK'; cardKey: CardKey; playerId: number }
     | { type: 'RESOLVE_GATLING'; playerId: number }
     | { type: 'RESOLVE_INDIANS'; playerId: number }
     | { type: 'RESOLVE_DUEL'; playerId: number }
+    | { type: 'RESOLVE_SALOON'; playerId: number }
     | { type: 'FINISH_ACTION' }
     | {
           type: 'PLAY_CARD';
@@ -335,6 +337,24 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             };
         }
 
+        case 'HEAL_A_PLAYER': {
+            const { playerId, amount } = action;
+            const player = state.players[playerId];
+
+            const applyHeal = state.players.map((p) =>
+                p.id === playerId ? { ...p, hp: p.hp + amount } : { ...p },
+            );
+
+            return {
+                ...state,
+                players: applyHeal,
+                log: [
+                    `${player.name} heal ${amount} LP → ${applyHeal[playerId].hp}/${applyHeal[playerId].maxHp} LP.`,
+                    ...state.log,
+                ],
+            };
+        }
+
         case 'RESOLVE_CARD_PICK': {
             const { source, idx, key } = action.payload;
             const { sourceId, targetId, type } = state.pendingAction!;
@@ -477,6 +497,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     `${state.players[playerId].name} discard a BANG! to stay in the duel.`,
                     ...state.log,
                 ],
+            };
+        }
+
+        case 'RESOLVE_SALOON': {
+            if (state.pendingAction?.type !== 'saloon') return { ...state };
+            const { playerId } = action;
+
+            const remainingQueue = removeElementFromArray(
+                playerId,
+                state.reactorId,
+            );
+
+            return {
+                ...state,
+                reactorId: remainingQueue,
             };
         }
 
@@ -816,8 +851,43 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     }
                 }
 
-                case 'saloon':
-                    return { ...state };
+                case 'saloon': {
+                    const newPlayerState = removeCardFromHand(
+                        cardKey,
+                        sourceId,
+                        state,
+                    );
+
+                    const startIndex = state.players.findIndex(
+                        (p) => p.id === sourceId,
+                    );
+                    const newReactors = [];
+                    for (let i = 0; i < state.players.length; i++) {
+                        const player =
+                            state.players[
+                                (startIndex + i) % state.players.length
+                            ];
+                        if (player.hp > 0 && player.id !== sourceId)
+                            newReactors.push(player.id);
+                    }
+
+                    return {
+                        ...state,
+                        players: newPlayerState,
+                        discardPile: [cardKey, ...state.discardPile],
+                        phase: cardKey,
+                        pendingAction: {
+                            type: cardKey,
+                            sourceId: sourceId,
+                            targetId: null,
+                        },
+                        reactorId: [...newReactors],
+                        log: [
+                            `${sourcePlayer.name} play Saloon! Everyone will gain 1 LP.`,
+                            ...state.log,
+                        ],
+                    };
+                }
 
                 case 'mustang':
                     return { ...state };

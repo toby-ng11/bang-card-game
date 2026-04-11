@@ -320,6 +320,29 @@ export default function App() {
             return () => clearTimeout(aiDelay);
         }
 
+        if (G.phase === 'saloon' && reactor && !reactor.isHuman) {
+            const aiDelay = setTimeout(() => {
+                // Trigger your beautiful popup!
+                triggerPopup(reactor.id, 'beer', 'heal');
+
+                const healAmount = 1;
+
+                dispatch({
+                    type: 'HEAL_A_PLAYER',
+                    playerId: reactor.id,
+                    amount: healAmount,
+                });
+
+                dispatch({
+                    type: 'RESOLVE_SALOON',
+                    playerId: reactor.id,
+                });
+
+                dispatch({ type: 'FINISH_ACTION' });
+            }, 1000);
+            return () => clearTimeout(aiDelay);
+        }
+
         const currentPickerId = G.generalStoreOrder?.[G.generalStoreIndex];
         const currentPicker = G.players.find((p) => p.id === currentPickerId);
         if (
