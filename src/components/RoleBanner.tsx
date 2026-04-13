@@ -8,10 +8,10 @@ const bannerVariants = cva(
     {
         variants: {
             role: {
-                sheriff: 'bg-[#FAEEDA] text-[#633806]',
-                deputy: 'bg-[#E6F1FB] text-[#042C53]',
-                outlaw: 'bg-[#FCEBEB] text-[#501313]',
-                renegade: 'bg-[#EEEDFE] text-[#26215C]',
+                SHERIFF: 'bg-[#FAEEDA] text-[#633806]',
+                DEPUTY: 'bg-[#E6F1FB] text-[#042C53]',
+                OUTLAW: 'bg-[#FCEBEB] text-[#501313]',
+                RENEGADE: 'bg-[#EEEDFE] text-[#26215C]',
             } satisfies Record<Role, string>,
         },
     },

@@ -8,16 +8,18 @@ import PlayerHand from '@/components/PlayerHand';
 import RoleBanner from '@/components/RoleBanner';
 import { Toaster } from '@/components/ui/sonner';
 import { CARD_DEFS } from '@/definitions/cards';
-import { showBanner } from '@/game/animation';
+import { showBanner, wait } from '@/game/animation';
 import { checkWin } from '@/game/combat';
-import { distance, inRange } from '@/game/helpers';
+import { distance, inRange, isEnemy } from '@/game/helpers';
 import { initGame } from '@/game/init';
 import { gameReducer } from '@/gameReducer';
 import { CardKey, CardPick, FlashMap } from '@/types';
 import { AnimatePresence } from 'motion/react';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { FloatAnimation } from './components/FloatLayer';
 import { BattleLogPanel } from './components/GameLogPanel';
 import PopupLayer from './components/PopupLayer';
+import { aiPickCardFrom } from './game/ai';
 
 export default function App() {
     const [G, dispatch] = useReducer(gameReducer, null, initGame);
@@ -29,7 +31,7 @@ export default function App() {
 
     const handleDraw = () => {
         if (!G.players[G.turn].isHuman || G.phase !== 'draw') return;
-        dispatch({ type: 'DRAW_CARDS_TO_START_TURN' });
+        dispatch({ type: 'DRAW_CARDS_TO_START_TURN', playerId: 0 });
     };
 
     const triggerPopup = (
@@ -173,6 +175,7 @@ export default function App() {
         dispatch({ type: 'SET_STATE', state: initGame() });
     }, [dispatch]);
 
+    // Auto effects
     useEffect(() => {
         const reactor = G.players.find((p) => p.id === G.reactorId[0]);
 
@@ -320,7 +323,7 @@ export default function App() {
             return () => clearTimeout(aiDelay);
         }
 
-        if (G.phase === 'saloon' && reactor && !reactor.isHuman) {
+        if (G.phase === 'saloon' && reactor) {
             const aiDelay = setTimeout(() => {
                 // Trigger your beautiful popup!
                 triggerPopup(reactor.id, 'beer', 'heal');
@@ -343,12 +346,15 @@ export default function App() {
             return () => clearTimeout(aiDelay);
         }
 
-        const currentPickerId = G.generalStoreOrder?.[G.generalStoreIndex];
-        const currentPicker = G.players.find((p) => p.id === currentPickerId);
+        const currentGeneralStorePickerId =
+            G.generalStoreOrder?.[G.generalStoreIndex];
+        const currentGeneralStorePicker = G.players.find(
+            (p) => p.id === currentGeneralStorePickerId,
+        );
         if (
             G.phase === 'generalstore' &&
-            currentPicker &&
-            !currentPicker.isHuman
+            currentGeneralStorePicker &&
+            !currentGeneralStorePicker.isHuman
         ) {
             const aiDelay = setTimeout(async () => {
                 // AI Logic: Priority is 'bang', otherwise take the first available card
@@ -362,19 +368,66 @@ export default function App() {
                 dispatch({
                     type: 'RESOLVE_GENERAL_STORE_PICK',
                     cardKey: pick,
-                    playerId: currentPicker.id,
+                    playerId: currentGeneralStorePicker.id,
                 });
 
                 // Show a quick banner so the human knows what the AI took
                 await showBanner(
-                    `${currentPicker.name} picks ${CARD_DEFS[pick]?.name || pick}.`,
+                    `${currentGeneralStorePicker.name} picks ${CARD_DEFS[pick]?.name || pick}.`,
                     700,
                 );
             }, 1200); // Slightly longer delay than reaction to feel more "natural"
 
             return () => clearTimeout(aiDelay);
         }
+
+        const currentCardPickerId = G.pendingAction?.sourceId;
+        const currentCardPicker = G.players.find(
+            (p) => p.id === currentCardPickerId,
+        );
+        const currentCardPickerTargetId = G.cardPickerTarget;
+        const currentCardPickerTarget = G.players.find(
+            (p) => p.id === currentCardPickerTargetId,
+        );
+
+        if (
+            (G.phase === 'panic' || G.phase === 'catbalou') &&
+            currentCardPicker &&
+            !currentCardPicker.isHuman &&
+            currentCardPickerTarget
+        ) {
+            const aiDelay = setTimeout(async () => {
+                const picked = aiPickCardFrom(
+                    G,
+                    currentCardPickerTarget,
+                    currentCardPicker,
+                );
+
+                if (picked !== null) {
+                    dispatch({
+                        type: 'RESOLVE_CARD_PICK',
+                        payload: picked,
+                    });
+
+                    dispatch({
+                        type: 'TRIGGER_FLOAT',
+                        cardKey: picked.key,
+                        fromId: currentCardPickerTarget.id,
+                        toId: currentCardPicker.id,
+                    });
+
+                    // Show a quick banner so the human knows what the AI took
+                    await showBanner(
+                        `${currentCardPicker.name} picks ${CARD_DEFS[picked.key]?.name || picked.key}.`,
+                        700,
+                    );
+                }
+            }, 1200); // Slightly longer delay than reaction to feel more "natural"
+
+            return () => clearTimeout(aiDelay);
+        }
     }, [
+        G,
         G.phase,
         G.reactorId,
         G.players,
@@ -385,6 +438,152 @@ export default function App() {
         G.generalStoreIndex,
         G.generalStoreOrder,
     ]);
+
+    // AI plays
+    useEffect(() => {
+        const player = G.players[G.turn];
+        if (!player.alive || player.isHuman) return;
+
+        if (G.phase === 'draw' && !G.over) {
+            showBanner(`${player.name}'s turn begins…`, 800);
+            dispatch({ type: 'DRAW_CARDS_TO_START_TURN', playerId: player.id });
+            wait(500);
+        }
+
+        const alivePlayers = G.players.filter((p) => p.alive);
+        if (!G.over && G.phase === 'play') {
+            if (
+                player.hp <= 2 &&
+                alivePlayers.length > 2 &&
+                player.hand.includes('beer')
+            ) {
+                const aiDelay = setTimeout(() => {
+                    triggerPopup(player.id, 'beer', 'heal');
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: 'beer',
+                        sourceId: player.id,
+                        targetId: null,
+                    });
+                }, 1500);
+                return () => clearTimeout(aiDelay);
+            }
+
+            if (player.hp < player.maxHp && player.hand.includes('saloon')) {
+                const aiDelay = setTimeout(() => {
+                    // Trigger your beautiful popup!
+                    triggerPopup(player.id, 'saloon', 'play');
+
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: 'saloon',
+                        sourceId: player.id,
+                        targetId: null,
+                    });
+                }, 1500);
+                return () => clearTimeout(aiDelay);
+            }
+
+            if (player.hand.includes('generalstore')) {
+                const aiDelay = setTimeout(async () => {
+                    triggerPopup(player.id, 'generalstore', 'play');
+
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: 'generalstore',
+                        sourceId: player.id,
+                        targetId: null,
+                    });
+                }, 1500);
+                return () => clearTimeout(aiDelay);
+            }
+
+            if (player.hand.includes('mustang')) {
+                const aiDelay = setTimeout(async () => {
+                    triggerPopup(player.id, 'mustang', 'play');
+
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: 'mustang',
+                        sourceId: player.id,
+                        targetId: null,
+                    });
+                }, 1500);
+                return () => clearTimeout(aiDelay);
+            }
+
+            if (player.hand.includes('scope')) {
+                const aiDelay = setTimeout(async () => {
+                    triggerPopup(player.id, 'scope', 'play');
+
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: 'scope',
+                        sourceId: player.id,
+                        targetId: null,
+                    });
+                }, 1500);
+                return () => clearTimeout(aiDelay);
+            }
+
+            if (player.hand.includes('panic')) {
+                const aiDelay = setTimeout(async () => {
+                    const targets = G.players.filter(
+                        (q) =>
+                            q.alive &&
+                            q.id !== player.id &&
+                            inRange(G.players, player.id, q.id) &&
+                            (q.hand.length > 0 || q.inPlay.length > 0),
+                    );
+
+                    if (targets.length) {
+                        const enemies = targets.filter((q) =>
+                            isEnemy(G, player.id, q.id),
+                        );
+                        const pool = enemies.length ? enemies : targets;
+
+                        const inPlayTargets = pool.filter(
+                            (q) => q.inPlay.length > 0,
+                        );
+
+                        const target = inPlayTargets.length
+                            ? inPlayTargets[
+                                  Math.floor(
+                                      Math.random() * inPlayTargets.length,
+                                  )
+                              ]
+                            : pool[Math.floor(Math.random() * pool.length)];
+
+                        const picked = aiPickCardFrom(G, target, player);
+
+                        console.log('pickeeeeeee: ' + picked);
+                        if (picked !== null) {
+                            dispatch({
+                                type: 'TRIGGER_FLOAT',
+                                cardKey: 'panic',
+                                fromId: player.id,
+                                toId: target.id,
+                            });
+
+                            await wait(1000);
+
+                            dispatch({
+                                type: 'PLAY_CARD',
+                                cardKey: 'panic',
+                                sourceId: player.id,
+                                targetId: target.id,
+                            });
+                        }
+                    } else {
+                        return;
+                    }
+                }, 1200);
+                return () => {
+                    clearTimeout(aiDelay);
+                };
+            }
+        }
+    }, [G, G.over, G.phase, G.players, G.turn, G.generalStoreCards]);
 
     console.log(G.discardPile);
     console.log(G.reactorId);
@@ -398,6 +597,13 @@ export default function App() {
             <div className="bg-radial-gradient(circle_at_center, transparent 0%, rgba(0,0,0,0.4) 100%) absolute inset-0" />
 
             <PopupLayer activePopups={G.activePopups} />
+
+            {G.floatingCard && (
+                <FloatAnimation
+                    {...G.floatingCard}
+                    onComplete={() => dispatch({ type: 'CLEAR_FLOAT' })}
+                />
+            )}
 
             <header className="fixed top-0 right-0 left-0 z-30 flex items-center justify-between bg-linear-to-b from-black/60 to-transparent p-4">
                 <RoleBanner human={human} />

@@ -50,11 +50,11 @@ export default function ActionButtons({
                     {G.selectedCard !== null &&
                         !G.targeting &&
                         (needsTarget ? (
-                            <Button onClick={onTargetPlayer}>
+                            <Button variant="secondary" onClick={onTargetPlayer}>
                                 Target Player
                             </Button>
                         ) : selectedCardKey !== 'missed' ? (
-                            <Button onClick={onPlayCard}>Play Card</Button>
+                            <Button variant="secondary" onClick={onPlayCard}>Play Card</Button>
                         ) : null)}
                     {G.targeting && (
                         <Button variant="outline" onClick={onCancelTarget}>
@@ -62,7 +62,7 @@ export default function ActionButtons({
                         </Button>
                     )}
                     {!G.targeting && (
-                        <Button variant="secondary" onClick={onEndTurn}>
+                        <Button onClick={onEndTurn}>
                             End Turn
                         </Button>
                     )}

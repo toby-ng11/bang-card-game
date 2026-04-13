@@ -51,20 +51,15 @@ function initGame(): GameState {
         const isHuman = i === 0;
         const initialHand = dealN(deck, role === 'SHERIFF' ? 5 : 4);
 
-        // Testing Hack: Ensure human always has General Store
-        if (isHuman) {
-            // Replace the last card with generalstore (or just push it)
-            initialHand[0] = 'saloon';
-        }
         return {
             id: i,
             name: names[i],
             role,
-            hp: role === 'SHERIFF' ? 5 : 1,
+            hp: role === 'SHERIFF' ? 5 : 2,
             maxHp: role === 'SHERIFF' ? 5 : 4,
             hand:
                 names[i] === 'Billy'
-                    ? ['beer', 'beer', 'beer']
+                    ? ['panic']
                     : names[i] === 'Rosa'
                       ? ['beer']
                       : initialHand,

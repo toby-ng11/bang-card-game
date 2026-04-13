@@ -9,12 +9,12 @@ export default function PhaseBar({ G }: PhaseBarProps) {
     const isHumanTurn = currentPlayer.isHuman;
 
     return (
-        <div className="mb-3 flex flex-row flex-wrap items-center justify-center gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm dark:border-gray-700 dark:bg-gray-900">
+        <div className="px-4 mb-3 flex flex-row flex-wrap items-center justify-center gap-4 rounded-lg border py-2 text-sm">
             <div className="font-medium">
                 {isHumanTurn ? 'Your turn' : currentPlayer.name + "'s Turn"}
             </div>
             <div>
-                Phase: <strong>{isHumanTurn ? G.phase : 'AI playing…'}</strong>
+                Phase: <strong>{G.phase}</strong>
             </div>
             <div>Deck: {G.deck.length}</div>
             <div>Discard Pile: {G.discardPile.length}</div>

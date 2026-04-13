@@ -13,12 +13,18 @@ export default function DeckSlot({ deck, discardPile }: DeckSlotProps) {
 
     return (
         <div className="ml-4 flex flex-col justify-center gap-4">
-            <div className="flex flex-col items-center gap-2 rounded-lg border border-amber-800/50 bg-black/20 p-4 transition duration-300 ease-in-out hover:border-amber-600">
+            <div
+                data-pid="deck"
+                className="flex flex-col items-center gap-2 rounded-lg border border-amber-800/50 bg-black/20 p-4 transition duration-300 ease-in-out hover:border-amber-600"
+            >
                 <div className="text-sm font-medium">DECK</div>
                 <div className="text-2xl">🂠</div>
                 <div className="text-sm text-secondary">{deck.length} left</div>
             </div>
-            <div className="flex flex-col items-center gap-2 rounded-lg border border-amber-800/50 bg-black/20 p-4 transition duration-300 ease-in-out hover:border-amber-600">
+            <div
+                data-pid="discard"
+                className="flex flex-col items-center gap-2 rounded-lg border border-amber-800/50 bg-black/20 p-4 transition duration-300 ease-in-out hover:border-amber-600"
+            >
                 <div className="text-sm font-medium">DISCARD</div>
                 <div
                     className={cn(

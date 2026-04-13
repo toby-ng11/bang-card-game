@@ -92,4 +92,21 @@ function waitForCardPick(
     });
 }
 
-export { dealN, distance, inRange, refillDeck, shuffle, waitForCardPick };
+function isEnemy(state: GameState, from: number, to: number) {
+    const f = state.players[from],
+        t = state.players[to];
+    if (f.role === 'SHERIFF' || f.role === 'DEPUTY')
+        return t.role === 'OUTLAW' || t.role === 'RENEGADE';
+    if (f.role === 'OUTLAW') return t.role === 'SHERIFF' || t.role === 'DEPUTY';
+    return t.role !== 'RENEGADE';
+}
+
+export {
+    dealN,
+    distance,
+    inRange,
+    isEnemy,
+    refillDeck,
+    shuffle,
+    waitForCardPick,
+};

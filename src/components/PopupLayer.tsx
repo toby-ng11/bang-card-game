@@ -1,6 +1,6 @@
 import { CARD_DEFS } from '@/definitions/cards';
 import { CardKey } from '@/types';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 
 interface PopupInstanceProps {

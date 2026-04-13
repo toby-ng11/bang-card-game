@@ -39,12 +39,19 @@ type GameAction =
           };
       }
     | { type: 'REMOVE_POPUP'; id: string }
+    | {
+          type: 'TRIGGER_FLOAT';
+          cardKey: CardKey;
+          fromId: number | string;
+          toId: number | string;
+      }
+    | { type: 'CLEAR_FLOAT' }
     | { type: 'ADD_LOG'; msg: string }
     | { type: 'NEXT_TURN' }
     | { type: 'SET_OVER'; winner: GameState['winner'] }
     | { type: 'DISCARD_TO_END_TURN'; idx: number }
     | { type: 'DISCARD_A_CARD_FROM_HAND'; playerId: number; cardKey: CardKey }
-    | { type: 'DRAW_CARDS_TO_START_TURN' }
+    | { type: 'DRAW_CARDS_TO_START_TURN'; playerId: number }
     | {
           type: 'TAKE_DAMAGE';
           sourceId: number | null;
@@ -93,18 +100,35 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 ),
             };
 
+        case 'TRIGGER_FLOAT':
+            return {
+                ...state,
+                floatingCard: {
+                    cardKey: action.cardKey,
+                    fromId: action.fromId,
+                    toId: action.toId,
+                },
+            };
+        case 'CLEAR_FLOAT':
+            return { ...state, floatingCard: null };
+
         case 'DRAW_CARDS_TO_START_TURN': {
+            const { playerId } = action;
             const { cards, state: newState } = dealN(state, 2);
+
             return {
                 ...newState,
-                players: newState.players.map((p, idx) =>
-                    idx === newState.turn
+                players: newState.players.map((p) =>
+                    p.id === playerId
                         ? { ...p, hand: [...p.hand, ...cards] }
                         : p,
                 ),
                 phase: 'play',
                 bangUsed: false,
-                log: [`You draws 2 cards.`, ...newState.log].slice(0, 25),
+                log: [
+                    `${newState.players[playerId].name} draws 2 cards.`,
+                    ...newState.log,
+                ].slice(0, 25),
             };
         }
 
@@ -342,7 +366,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             const player = state.players[playerId];
 
             const applyHeal = state.players.map((p) =>
-                p.id === playerId ? { ...p, hp: p.hp + amount } : { ...p },
+                p.id === playerId
+                    ? { ...p, hp: Math.min(p.hp + amount, p.maxHp) }
+                    : { ...p },
             );
 
             return {
@@ -356,6 +382,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
 
         case 'RESOLVE_CARD_PICK': {
+            if (
+                state.pendingAction?.type !== 'panic' &&
+                state.pendingAction?.type !== 'catbalou'
+            )
+                return { ...state };
             const { source, idx, key } = action.payload;
             const { sourceId, targetId, type } = state.pendingAction!;
 
@@ -544,7 +575,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     } else {
                         const applyHeal = newPlayerState.map((p) =>
                             p.id === sourceId
-                                ? { ...p, hp: p.hp + 1 }
+                                ? { ...p, hp: Math.min(p.hp + 1, p.maxHp) }
                                 : { ...p },
                         );
 
@@ -553,7 +584,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                             players: applyHeal,
                             discardPile: ['beer', ...state.discardPile],
                             log: [
-                                `${sourcePlayer.name} heals +1 LP → ${sourcePlayer.hp}/${sourcePlayer.maxHp}.`,
+                                `${sourcePlayer.name} played a Beer and heals +1 LP → ${applyHeal[sourceId].hp}/${applyHeal[sourceId].maxHp}.`,
                                 ...state.log,
                             ],
                         };
@@ -583,7 +614,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
                 case 'panic':
                 case 'catbalou': {
-                    if (!targetId) return { ...state };
+                    if (targetId === null) return { ...state };
 
                     const targetPlayer = state.players[targetId];
                     const newPlayerState = removeCardFromHand(
@@ -668,7 +699,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
                 case 'bang': {
                     //const hasVolcanic = state.players[shooterIdx].inPlay.includes('volcanic');
-                    if (!targetId) return { ...state };
+                    if (targetId === null) return { ...state };
                     else {
                         const targetPlayer = state.players[targetId];
                         if (state.bangUsed) {
@@ -822,7 +853,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 }
 
                 case 'duel': {
-                    if (!targetId) return { ...state };
+                    if (targetId === null) return { ...state };
                     else {
                         const targetPlayer = state.players[targetId];
                         const newPlayerState = removeCardFromHand(
@@ -889,11 +920,51 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     };
                 }
 
-                case 'mustang':
-                    return { ...state };
+                case 'mustang': {
+                    const newPlayerState = removeCardFromHand(
+                        cardKey,
+                        sourceId,
+                        state,
+                    );
 
-                case 'scope':
-                    return { ...state };
+                    const applyMustang = newPlayerState.map((p) =>
+                        p.id === sourceId
+                            ? { ...p, inPlay: [cardKey, ...p.inPlay] }
+                            : p,
+                    );
+
+                    return {
+                        ...state,
+                        players: applyMustang,
+                        log: [
+                            `${sourcePlayer.name} play Mustang! Everyone will see ${sourcePlayer.name} at +1 distance.`,
+                            ...state.log,
+                        ],
+                    };
+                }
+
+                case 'scope': {
+                    const newPlayerState = removeCardFromHand(
+                        cardKey,
+                        sourceId,
+                        state,
+                    );
+
+                    const applyMustang = newPlayerState.map((p) =>
+                        p.id === sourceId
+                            ? { ...p, inPlay: [cardKey, ...p.inPlay] }
+                            : p,
+                    );
+
+                    return {
+                        ...state,
+                        players: applyMustang,
+                        log: [
+                            `${sourcePlayer.name} play Scope! ${sourcePlayer.name} will see everyone at -1 distance.`,
+                            ...state.log,
+                        ],
+                    };
+                }
 
                 default:
                     return { ...state };

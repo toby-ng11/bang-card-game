@@ -101,6 +101,12 @@ export interface GameState {
         cardKey: CardKey;
         type: 'play' | 'damage' | 'heal';
     }>;
+
+    floatingCard: {
+        cardKey: CardKey;
+        fromId: number | string;
+        toId: number | string;
+    } | null;
 }
 
 // ── Layout ───────────────────────────────────────────────────────
