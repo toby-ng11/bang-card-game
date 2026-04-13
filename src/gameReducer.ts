@@ -7,6 +7,7 @@ import {
     Phase,
     Player,
     PlayerAction,
+    Role,
 } from './types';
 
 type GameAction =
@@ -42,8 +43,9 @@ type GameAction =
     | {
           type: 'TRIGGER_FLOAT';
           cardKey: CardKey;
-          fromId: number | string;
-          toId: number | string;
+          fromId: number | 'deck' | 'discard';
+          toId: number | 'deck' | 'discard';
+          count?: number;
       }
     | { type: 'CLEAR_FLOAT' }
     | { type: 'ADD_LOG'; msg: string }
@@ -73,7 +75,8 @@ type GameAction =
           sourceId: number;
           targetId: number | null;
       }
-    | { type: 'END_TURN' };
+    | { type: 'END_TURN'; playerId: number }
+    | { type: 'CANCEL_END_TURN'; playerId: number };
 
 function gameReducer(state: GameState, action: GameAction): GameState {
     console.log('REDUCER ACTION:', action);
@@ -107,6 +110,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     cardKey: action.cardKey,
                     fromId: action.fromId,
                     toId: action.toId,
+                    count: action.count,
                 },
             };
         case 'CLEAR_FLOAT':
@@ -197,7 +201,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             newState.log = [
                 `You discard ${CARD_DEFS[discarded[0]]?.name || discarded[0]}.`,
                 ...newState.log,
-            ].slice(0, 25);
+            ];
 
             if (player.hand.length <= player.hp) {
                 newState.discardingToEndTurn = false;
@@ -221,19 +225,29 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
         case 'DISCARD_A_CARD_FROM_HAND': {
             const { playerId, cardKey } = action;
+            const player = state.players[playerId];
 
             const newPlayerState = removeCardFromHand(cardKey, playerId, state);
-            return { ...state, players: newPlayerState };
+            return {
+                ...state,
+                players: newPlayerState,
+                discardPile: [cardKey, ...state.discardPile],
+                log: [
+                    `${player.name} discard a ${CARD_DEFS[cardKey].name || cardKey}.`,
+                    ...state.log,
+                ],
+            };
         }
 
         case 'END_TURN': {
-            const human = state.players[0];
-            if (human.hand.length > human.hp) {
+            const playerId = action.playerId;
+            const player = state.players[playerId];
+            if (player.hand.length > player.hp) {
                 return {
                     ...state,
                     discardingToEndTurn: true,
                     log: [
-                        `Discard ${human.hand.length - human.hp} card(s) first (hand limit = your HP).`,
+                        `${player.name} must discard ${player.hand.length - player.hp} card(s) first before ending turn.`,
                         ...state.log,
                     ],
                 };
@@ -253,6 +267,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 selectedCard: null,
                 targeting: false,
                 discardingToEndTurn: false,
+                log: [`${player.name} ends turn.`, ...state.log],
+            };
+        }
+
+        case 'CANCEL_END_TURN': {
+            if (!state.discardingToEndTurn) return { ...state };
+            const playerId = action.playerId;
+            const player = state.players[playerId];
+
+            return {
+                ...state,
+                discardingToEndTurn: false,
+                log: [
+                    `${player.name} cancel discard to end turn.`,
+                    ...state.log,
+                ],
             };
         }
 
@@ -1014,7 +1044,14 @@ function handleElimination(
     // 1. Mark player as eliminated
     let updatedPlayers = players.map((p) =>
         p.id === deadId
-            ? { ...p, hp: 0, isEliminated: true, hand: [], table: [] }
+            ? {
+                  ...p,
+                  hp: 0,
+                  alive: false,
+                  isEliminated: true,
+                  hand: [],
+                  inPlay: [],
+              }
             : p,
     );
 
@@ -1035,7 +1072,7 @@ function handleElimination(
         // Rule: Sheriff kills a Deputy -> Sheriff loses EVERYTHING
         if (killer.role === 'SHERIFF' && deadPlayer.role === 'DEPUTY') {
             updatedPlayers = updatedPlayers.map((p) =>
-                p.id === killerId ? { ...p, hand: [], table: [] } : p,
+                p.id === killerId ? { ...p, hand: [], inPlay: [] } : p,
             );
         }
     }
@@ -1043,6 +1080,7 @@ function handleElimination(
     // 4. CHECK WIN CONDITIONS
     const aliveRoles = updatedPlayers.filter((p) => p.alive).map((p) => p.role);
     let gameOverMessage = null;
+    let gameWinner: Role | null = null;
 
     if (!aliveRoles.includes('SHERIFF')) {
         // If Sheriff is dead, check if a Renegade is the only one left
@@ -1050,17 +1088,25 @@ function handleElimination(
             aliveRoles.length === 1 && aliveRoles[0] === 'RENEGADE'
                 ? 'Renegade Wins!'
                 : 'Outlaws Win!';
+
+        gameWinner =
+            aliveRoles.length === 1 && aliveRoles[0] === 'RENEGADE'
+                ? 'RENEGADE'
+                : 'OUTLAW';
     } else if (
         !aliveRoles.includes('OUTLAW') &&
         !aliveRoles.includes('RENEGADE')
     ) {
         gameOverMessage = 'Sheriff and Deputies Win!';
+        gameWinner = 'SHERIFF';
     }
 
     return {
         ...state,
         players: updatedPlayers,
         discardPile: newDiscard,
+        over: gameOverMessage !== null ? true : false,
+        winner: gameWinner,
         phase: gameOverMessage
             ? 'game-over'
             : pendingAction

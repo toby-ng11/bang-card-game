@@ -55,14 +55,9 @@ function initGame(): GameState {
             id: i,
             name: names[i],
             role,
-            hp: role === 'SHERIFF' ? 5 : 2,
+            hp: role === 'SHERIFF' ? 5 : 4,
             maxHp: role === 'SHERIFF' ? 5 : 4,
-            hand:
-                names[i] === 'Billy'
-                    ? ['catbalou']
-                    : names[i] === 'Rosa'
-                      ? ['beer']
-                      : initialHand,
+            hand: initialHand,
 
             alive: true,
             isHuman,

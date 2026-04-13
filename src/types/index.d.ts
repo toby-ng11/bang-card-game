@@ -104,8 +104,9 @@ export interface GameState {
 
     floatingCard: {
         cardKey: CardKey;
-        fromId: number | string;
-        toId: number | string;
+        fromId: number | 'deck' | 'discard';
+        toId: number | 'deck' | 'discard';
+        count?: number;
     } | null;
 }
 

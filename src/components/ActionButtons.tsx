@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { CardKey, GameState, Player } from '@/types';
 import { HeartCrack, Swords, Zap } from 'lucide-react';
 
@@ -10,6 +11,7 @@ interface ActionButtonsProps {
     onPlayCard: () => void;
     onCancelTarget: () => void;
     onEndTurn: () => void;
+    onCancelEndTurn: () => void;
     onDuelingDiscardBang: () => void;
     onDuelingTakeDamage: () => void;
 }
@@ -22,6 +24,7 @@ export default function ActionButtons({
     onPlayCard,
     onCancelTarget,
     onEndTurn,
+    onCancelEndTurn,
     onDuelingDiscardBang,
     onDuelingTakeDamage,
 }: ActionButtonsProps) {
@@ -39,22 +42,55 @@ export default function ActionButtons({
         <div className="flex w-full flex-col justify-center gap-2">
             {/* Draw phase */}
             {isMyTurn && G.phase === 'draw' && (
-                <Button variant="default" onClick={onDraw}>
-                    Draw 2 Cards
-                </Button>
-            )}
+                <div className="relative flex items-center justify-center p-2">
+                    {/* The Pulsing Notification Ring */}
+                    <div className="absolute inset-0 animate-pulse rounded-full border-4 border-amber-500/60" />
+                    <div className="absolute inset-0 animate-ping rounded-full border-2 border-amber-600" />
 
+                    <Button
+                        variant="outline"
+                        onClick={onDraw}
+                        className={cn(
+                            'relative h-20 w-20 rounded-full border-4 border-amber-700 bg-[#2a1810]',
+                            'flex flex-col items-center justify-center gap-0.5 shadow-[0_0_20px_rgba(180,83,9,0.4)]',
+                            'transition-all duration-300 hover:scale-110 hover:border-amber-500 hover:shadow-amber-500/50',
+                            'group active:scale-95',
+                        )}
+                    >
+                        {/* Decorative inner ring */}
+                        <div className="pointer-events-none absolute inset-1 rounded-full border border-amber-900/50" />
+
+                        <span className="text-[10px] font-black tracking-tighter text-amber-600 uppercase group-hover:text-amber-400">
+                            Start
+                        </span>
+
+                        <div className="my-0.5 flex -space-x-2">
+                            <div className="h-6 w-4 rotate-15 rounded-sm border border-amber-800 bg-stone-100 shadow-sm" />
+                            <div className="h-6 w-4 rotate-15 rounded-sm border border-amber-800 bg-stone-200 shadow-sm" />
+                        </div>
+
+                        <span className="text-[10px] font-bold text-amber-500 group-hover:text-amber-300">
+                            DRAW 2
+                        </span>
+                    </Button>
+                </div>
+            )}
             {/* Play phase */}
             {isMyTurn && G.phase === 'play' && !G.discardingToEndTurn && (
                 <>
                     {G.selectedCard !== null &&
                         !G.targeting &&
                         (needsTarget ? (
-                            <Button variant="secondary" onClick={onTargetPlayer}>
+                            <Button
+                                variant="secondary"
+                                onClick={onTargetPlayer}
+                            >
                                 Target Player
                             </Button>
                         ) : selectedCardKey !== 'missed' ? (
-                            <Button variant="secondary" onClick={onPlayCard}>Play Card</Button>
+                            <Button variant="secondary" onClick={onPlayCard}>
+                                Play Card
+                            </Button>
                         ) : null)}
                     {G.targeting && (
                         <Button variant="outline" onClick={onCancelTarget}>
@@ -62,13 +98,10 @@ export default function ActionButtons({
                         </Button>
                     )}
                     {!G.targeting && (
-                        <Button onClick={onEndTurn}>
-                            End Turn
-                        </Button>
+                        <Button onClick={onEndTurn}>End Turn</Button>
                     )}
                 </>
             )}
-
             {G.phase === 'duel' && G.reactorId[0] === human.id && (
                 <div className="flex animate-in flex-col items-center gap-4 duration-300 fade-in zoom-in">
                     {/* Duel Info Header */}
@@ -138,7 +171,10 @@ export default function ActionButtons({
                     </div>
                 </div>
             )}
-
+            {G.discardingToEndTurn && (
+                <Button onClick={onCancelEndTurn}>Cancel Discard</Button>
+            )}
+            {}
             {/* AI turn */}
             {!isMyTurn && (
                 <button type="button" className="btn" disabled>

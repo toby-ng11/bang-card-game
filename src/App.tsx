@@ -29,8 +29,19 @@ export default function App() {
     const GRef = useRef(G);
     GRef.current = G;
 
-    const handleDraw = () => {
+    const handleDraw = async () => {
         if (!G.players[G.turn].isHuman || G.phase !== 'draw') return;
+
+        dispatch({
+            type: 'TRIGGER_FLOAT',
+            cardKey: 'bang',
+            fromId: 'deck',
+            toId: 0,
+            count: 2,
+        });
+
+        await wait(500);
+
         dispatch({ type: 'DRAW_CARDS_TO_START_TURN', playerId: 0 });
     };
 
@@ -103,6 +114,10 @@ export default function App() {
                 targeting: state.targeting,
                 selectedCard: state.selectedCard,
                 targetId,
+                hand: state.players[targetId].hand,
+                bangUsed: state.bangUsed,
+                alive: state.players[targetId].alive,
+                cardPick: state.cardPickerTarget,
             });
             if (!state.targeting || state.selectedCard === null) return;
 
@@ -119,7 +134,19 @@ export default function App() {
                 s.log = [
                     `${target.name} is out of range! (distance ${distance(state.players, 0, targetId)})`,
                     ...s.log,
-                ].slice(0, 25);
+                ];
+                dispatch({ type: 'SET_STATE', state: s });
+                return;
+            }
+
+            const needsCards = ['catbalou', 'panic'].includes(cardKey);
+            if (
+                needsCards &&
+                target.hand.length === 0 &&
+                target.inPlay.length === 0
+            ) {
+                const s = structuredClone(state);
+                s.log = [`${target.name} has no card!`, ...s.log];
                 dispatch({ type: 'SET_STATE', state: s });
                 return;
             }
@@ -129,6 +156,15 @@ export default function App() {
                 `${p.name} play a ${CARD_DEFS[cardKey].name}!`,
                 900,
             );
+
+            dispatch({
+                type: 'TRIGGER_FLOAT',
+                cardKey: cardKey,
+                fromId: p.id,
+                toId: target.id,
+            });
+
+            await wait(1000);
 
             dispatch({
                 type: 'PLAY_CARD',
@@ -159,6 +195,28 @@ export default function App() {
             900,
         );
 
+        if (cardKey === 'stagecoach') {
+            dispatch({
+                type: 'TRIGGER_FLOAT',
+                cardKey: 'bang',
+                fromId: 'deck',
+                toId: 0,
+                count: 2,
+            });
+            await wait(1000);
+        }
+
+        if (cardKey === 'wellsfargo') {
+            dispatch({
+                type: 'TRIGGER_FLOAT',
+                cardKey: 'bang',
+                fromId: 'deck',
+                toId: 0,
+                count: 3,
+            });
+            await wait(1000);
+        }
+
         dispatch({
             type: 'PLAY_CARD',
             cardKey: cardKey,
@@ -168,8 +226,12 @@ export default function App() {
     }, [G.players, G.selectedCard, G.turn]);
 
     const handleEndTurn = useCallback(() => {
-        dispatch({ type: 'END_TURN' });
-    }, [dispatch]);
+        dispatch({ type: 'END_TURN', playerId: human.id });
+    }, [dispatch, human.id]);
+
+    const handleCancelEndTurn = useCallback(() => {
+        dispatch({ type: 'CANCEL_END_TURN', playerId: human.id });
+    }, [dispatch, human.id]);
 
     const restartGame = useCallback(() => {
         dispatch({ type: 'SET_STATE', state: initGame() });
@@ -209,7 +271,7 @@ export default function App() {
             return () => clearTimeout(aiDelay);
         }
 
-        if (G.phase === 'bang' && reactor && !reactor.isHuman) {
+        if (G.phase === 'bang' && reactor) {
             const aiDelay = setTimeout(async () => {
                 const hasMissed = reactor.hand.includes('missed');
                 if (hasMissed) {
@@ -235,9 +297,21 @@ export default function App() {
             return () => clearTimeout(aiDelay);
         }
 
-        if (G.phase === 'gatling' && reactor && !reactor.isHuman) {
-            const aiDelay = setTimeout(() => {
+        if (G.phase === 'gatling' && reactor) {
+            const aiDelay = setTimeout(async () => {
                 const hasMissed = reactor.hand.includes('missed');
+                const sourceId = G.pendingAction?.sourceId;
+
+                if (sourceId !== undefined) {
+                    dispatch({
+                        type: 'TRIGGER_FLOAT',
+                        cardKey: 'gatling',
+                        fromId: sourceId,
+                        toId: reactor.id,
+                    });
+                }
+
+                await wait(1000);
 
                 if (hasMissed) {
                     // Trigger your beautiful popup!
@@ -265,9 +339,21 @@ export default function App() {
             return () => clearTimeout(aiDelay);
         }
 
-        if (G.phase === 'indians' && reactor && !reactor.isHuman) {
-            const aiDelay = setTimeout(() => {
+        if (G.phase === 'indians' && reactor) {
+            const aiDelay = setTimeout(async () => {
                 const hasBang = reactor.hand.includes('bang');
+                const sourceId = G.pendingAction?.sourceId;
+
+                if (sourceId !== undefined) {
+                    dispatch({
+                        type: 'TRIGGER_FLOAT',
+                        cardKey: 'gatling',
+                        fromId: sourceId,
+                        toId: reactor.id,
+                    });
+                }
+
+                await wait(1000);
 
                 if (hasBang) {
                     // Trigger your beautiful popup!
@@ -457,16 +543,34 @@ export default function App() {
     // AI plays
     useEffect(() => {
         const player = G.players[G.turn];
-        if (!player.alive || player.isHuman) return;
+        if (!player.alive || player.isHuman || G.over) return;
 
-        if (G.phase === 'draw' && !G.over) {
-            showBanner(`${player.name}'s turn begins…`, 800);
-            dispatch({ type: 'DRAW_CARDS_TO_START_TURN', playerId: player.id });
-            wait(500);
+        if (G.phase === 'draw') {
+            const drawDelay = setTimeout(async () => {
+                showBanner(`${player.name}'s turn begins…`, 800);
+
+                dispatch({
+                    type: 'TRIGGER_FLOAT',
+                    cardKey: 'bang',
+                    fromId: 'deck',
+                    toId: player.id,
+                    count: 2,
+                });
+
+                await wait(500);
+
+                dispatch({
+                    type: 'DRAW_CARDS_TO_START_TURN',
+                    playerId: player.id,
+                });
+            }, 1000);
+            return () => {
+                clearTimeout(drawDelay);
+            };
         }
 
         const alivePlayers = G.players.filter((p) => p.alive);
-        if (!G.over && G.phase === 'play') {
+        if (G.phase === 'play') {
             if (
                 player.hp <= 2 &&
                 alivePlayers.length > 2 &&
@@ -503,6 +607,8 @@ export default function App() {
                 const aiDelay = setTimeout(async () => {
                     triggerPopup(player.id, 'generalstore', 'play');
 
+                    await wait(1000);
+
                     dispatch({
                         type: 'PLAY_CARD',
                         cardKey: 'generalstore',
@@ -513,7 +619,62 @@ export default function App() {
                 return () => clearTimeout(aiDelay);
             }
 
-            if (player.hand.includes('mustang')) {
+            if (player.hand.includes('stagecoach')) {
+                const aiDelay = setTimeout(async () => {
+                    triggerPopup(player.id, 'stagecoach', 'play');
+
+                    await wait(1000);
+
+                    dispatch({
+                        type: 'TRIGGER_FLOAT',
+                        cardKey: 'bang',
+                        fromId: 'deck',
+                        toId: player.id,
+                        count: 2,
+                    });
+
+                    await wait(1000);
+
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: 'stagecoach',
+                        sourceId: player.id,
+                        targetId: null,
+                    });
+                }, 1500);
+                return () => clearTimeout(aiDelay);
+            }
+
+            if (player.hand.includes('wellsfargo')) {
+                const aiDelay = setTimeout(async () => {
+                    triggerPopup(player.id, 'wellsfargo', 'play');
+
+                    await wait(1000);
+
+                    dispatch({
+                        type: 'TRIGGER_FLOAT',
+                        cardKey: 'bang',
+                        fromId: 'deck',
+                        toId: player.id,
+                        count: 3,
+                    });
+
+                    await wait(1000);
+
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: 'wellsfargo',
+                        sourceId: player.id,
+                        targetId: null,
+                    });
+                }, 1500);
+                return () => clearTimeout(aiDelay);
+            }
+
+            if (
+                player.hand.includes('mustang') &&
+                !player.inPlay.includes('mustang')
+            ) {
                 const aiDelay = setTimeout(async () => {
                     triggerPopup(player.id, 'mustang', 'play');
 
@@ -527,7 +688,10 @@ export default function App() {
                 return () => clearTimeout(aiDelay);
             }
 
-            if (player.hand.includes('scope')) {
+            if (
+                player.hand.includes('scope') &&
+                !player.inPlay.includes('scope')
+            ) {
                 const aiDelay = setTimeout(async () => {
                     triggerPopup(player.id, 'scope', 'play');
 
@@ -542,7 +706,7 @@ export default function App() {
             }
 
             if (player.hand.includes('panic')) {
-                const aiDelay = setTimeout(async () => {
+                const canPlayPanic = (() => {
                     const targets = G.players.filter(
                         (q) =>
                             q.alive &&
@@ -550,117 +714,243 @@ export default function App() {
                             inRange(G.players, player.id, q.id) &&
                             (q.hand.length > 0 || q.inPlay.length > 0),
                     );
+                    if (!targets.length) return false;
 
-                    if (targets.length) {
-                        const enemies = targets.filter((q) =>
-                            isEnemy(G, player.id, q.id),
-                        );
-                        const pool = enemies.length ? enemies : targets;
+                    const enemies = targets.filter((q) =>
+                        isEnemy(G, player.id, q.id),
+                    );
+                    const pool = enemies.length ? enemies : targets;
+                    const inPlayTargets = pool.filter(
+                        (q) => q.inPlay.length > 0,
+                    );
+                    const target = inPlayTargets.length
+                        ? inPlayTargets[
+                              Math.floor(Math.random() * inPlayTargets.length)
+                          ]
+                        : pool[Math.floor(Math.random() * pool.length)];
 
-                        const inPlayTargets = pool.filter(
-                            (q) => q.inPlay.length > 0,
-                        );
+                    return aiPickCardFrom(G, target, player) !== null
+                        ? target
+                        : false;
+                })();
 
-                        const target = inPlayTargets.length
-                            ? inPlayTargets[
-                                  Math.floor(
-                                      Math.random() * inPlayTargets.length,
-                                  )
-                              ]
-                            : pool[Math.floor(Math.random() * pool.length)];
+                if (canPlayPanic) {
+                    const target = canPlayPanic;
+                    const aiDelay = setTimeout(async () => {
+                        dispatch({
+                            type: 'TRIGGER_FLOAT',
+                            cardKey: 'panic',
+                            fromId: player.id,
+                            toId: target.id,
+                        });
 
-                        const picked = aiPickCardFrom(G, target, player);
+                        await wait(1000);
 
-                        console.log('pickeeeeeee: ' + picked);
-                        if (picked !== null) {
-                            dispatch({
-                                type: 'TRIGGER_FLOAT',
-                                cardKey: 'panic',
-                                fromId: player.id,
-                                toId: target.id,
-                            });
-
-                            await wait(1000);
-
-                            dispatch({
-                                type: 'PLAY_CARD',
-                                cardKey: 'panic',
-                                sourceId: player.id,
-                                targetId: target.id,
-                            });
-                        }
-                    } else {
-                        return;
-                    }
-                }, 1200);
-                return () => {
-                    clearTimeout(aiDelay);
-                };
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'panic',
+                            sourceId: player.id,
+                            targetId: target.id,
+                        });
+                    }, 1200);
+                    return () => clearTimeout(aiDelay);
+                }
             }
 
             if (player.hand.includes('catbalou')) {
-                const aiDelay = setTimeout(async () => {
+                const canPlayCatbalou = (() => {
                     const targets = G.players.filter(
                         (q) =>
                             q.alive &&
                             q.id !== player.id &&
-                            inRange(G.players, player.id, q.id) &&
                             (q.hand.length > 0 || q.inPlay.length > 0),
                     );
+                    if (!targets.length) return false;
 
-                    if (targets.length) {
-                        const enemies = targets.filter((q) =>
+                    const enemies = targets.filter((q) =>
+                        isEnemy(G, player.id, q.id),
+                    );
+                    const pool = enemies.length ? enemies : targets;
+
+                    const mustangBlockers = pool.filter(
+                        (q) =>
+                            q.inPlay.includes('mustang') &&
+                            !inRange(G.players, player.id, q.id),
+                    );
+                    const inPlayTargets = pool.filter(
+                        (q) => q.inPlay.length > 0,
+                    );
+                    const target = mustangBlockers.length
+                        ? mustangBlockers[
+                              Math.floor(Math.random() * mustangBlockers.length)
+                          ]
+                        : inPlayTargets.length
+                          ? inPlayTargets[
+                                Math.floor(Math.random() * inPlayTargets.length)
+                            ]
+                          : pool[Math.floor(Math.random() * pool.length)];
+
+                    return aiPickCardFrom(G, target, player) !== null
+                        ? target
+                        : false;
+                })();
+
+                if (canPlayCatbalou) {
+                    const target = canPlayCatbalou;
+                    const aiDelay = setTimeout(async () => {
+                        dispatch({
+                            type: 'TRIGGER_FLOAT',
+                            cardKey: 'catbalou',
+                            fromId: player.id,
+                            toId: target.id,
+                        });
+
+                        await wait(1000);
+
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'catbalou',
+                            sourceId: player.id,
+                            targetId: target.id,
+                        });
+                    }, 1200);
+                    return () => clearTimeout(aiDelay);
+                }
+                // fall through to discard/end turn
+            }
+
+            if (player.hand.includes('gatling')) {
+                const aiDelay = setTimeout(() => {
+                    // Trigger your beautiful popup!
+                    triggerPopup(player.id, 'gatling', 'play');
+
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: 'gatling',
+                        sourceId: player.id,
+                        targetId: null,
+                    });
+                }, 1500);
+                return () => clearTimeout(aiDelay);
+            }
+
+            if (player.hand.includes('indians')) {
+                const aiDelay = setTimeout(() => {
+                    // Trigger your beautiful popup!
+                    triggerPopup(player.id, 'indians', 'play');
+
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: 'indians',
+                        sourceId: player.id,
+                        targetId: null,
+                    });
+                }, 1500);
+                return () => clearTimeout(aiDelay);
+            }
+
+            if (player.hand.includes('duel') && player.hand.includes('bang')) {
+                const duelTarget = (() => {
+                    const enemies = G.players.filter(
+                        (q) =>
+                            q.alive &&
+                            q.id !== player.id &&
                             isEnemy(G, player.id, q.id),
-                        );
-                        const pool = enemies.length ? enemies : targets;
+                    );
+                    if (!enemies.length) return false;
+                    return enemies.reduce((a, b) => (b.hp < a.hp ? b : a));
+                })();
 
-                        const mustangBlockers = pool.filter(
-                            (q) =>
-                                q.inPlay.includes('mustang') &&
-                                !inRange(G.players, player.id, q.id),
-                        );
+                if (duelTarget) {
+                    const aiDelay = setTimeout(async () => {
+                        dispatch({
+                            type: 'TRIGGER_FLOAT',
+                            cardKey: 'duel',
+                            fromId: player.id,
+                            toId: duelTarget.id,
+                        });
 
-                        const inPlayTargets = pool.filter(
-                            (q) => q.inPlay.length > 0,
-                        );
+                        await wait(1000);
 
-                        const target = mustangBlockers.length
-                            ? mustangBlockers[
-                                  Math.floor(
-                                      Math.random() * mustangBlockers.length,
-                                  )
-                              ]
-                            : inPlayTargets.length
-                              ? inPlayTargets[
-                                    Math.floor(
-                                        Math.random() * inPlayTargets.length,
-                                    )
-                                ]
-                              : pool[Math.floor(Math.random() * pool.length)];
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'duel',
+                            sourceId: player.id,
+                            targetId: duelTarget.id,
+                        });
+                    }, 1200);
+                    return () => {
+                        clearTimeout(aiDelay);
+                    };
+                }
+            }
 
-                        const picked = aiPickCardFrom(G, target, player);
+            if (player.hand.includes('bang') && !G.bangUsed) {
+                const bangTarget = (() => {
+                    const enemies = G.players.filter(
+                        (q) =>
+                            q.alive &&
+                            q.id !== player.id &&
+                            isEnemy(G, player.id, q.id) &&
+                            inRange(G.players, player.id, q.id),
+                    );
+                    if (!enemies.length) return false;
+                    return enemies.reduce((a, b) => (b.hp < a.hp ? b : a));
+                })();
 
-                        if (picked !== null) {
-                            dispatch({
-                                type: 'TRIGGER_FLOAT',
-                                cardKey: 'catbalou',
-                                fromId: player.id,
-                                toId: target.id,
-                            });
+                if (bangTarget) {
+                    const aiDelay = setTimeout(async () => {
+                        dispatch({
+                            type: 'TRIGGER_FLOAT',
+                            cardKey: 'bang',
+                            fromId: player.id,
+                            toId: bangTarget.id,
+                        });
 
-                            await wait(1000);
+                        await wait(1000);
 
-                            dispatch({
-                                type: 'PLAY_CARD',
-                                cardKey: 'catbalou',
-                                sourceId: player.id,
-                                targetId: target.id,
-                            });
-                        }
-                    } else {
-                        return;
-                    }
-                }, 1200);
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'bang',
+                            sourceId: player.id,
+                            targetId: bangTarget.id,
+                        });
+                    }, 1200);
+                    return () => clearTimeout(aiDelay);
+                }
+            }
+
+            const maxCards = player.hp;
+            if (player.hand.length > maxCards) {
+                const aiDelay = setTimeout(async () => {
+                    const cardIdx = Math.floor(
+                        Math.random() * player.hand.length,
+                    );
+                    const cardKey = player.hand[cardIdx];
+
+                    dispatch({
+                        type: 'TRIGGER_FLOAT',
+                        cardKey: cardKey,
+                        fromId: player.id,
+                        toId: 'discard',
+                    });
+
+                    await wait(1000);
+
+                    dispatch({
+                        type: 'DISCARD_A_CARD_FROM_HAND',
+                        playerId: player.id,
+                        cardKey: cardKey,
+                    });
+                }, 1500);
+                return () => {
+                    clearTimeout(aiDelay);
+                };
+            } else {
+                const aiDelay = setTimeout(async () => {
+                    await showBanner(`${player.name} ends their turn.`, 800);
+                    dispatch({ type: 'END_TURN', playerId: player.id });
+                }, 1500);
                 return () => {
                     clearTimeout(aiDelay);
                 };
@@ -765,12 +1055,13 @@ export default function App() {
                                     targeting: false,
                                 })
                             }
-                            onDuelingDiscardBang={() =>
+                            onDuelingDiscardBang={() => {
+                                triggerPopup(human.id, 'bang', 'play');
                                 dispatch({
                                     type: 'RESOLVE_DUEL',
                                     playerId: human.id,
-                                })
-                            }
+                                });
+                            }}
                             onDuelingTakeDamage={() => {
                                 triggerPopup(human.id, 'duel', 'damage');
                                 dispatch({
@@ -783,6 +1074,7 @@ export default function App() {
                                 dispatch({ type: 'FINISH_ACTION' });
                             }}
                             onEndTurn={handleEndTurn}
+                            onCancelEndTurn={handleCancelEndTurn}
                         />
                     </div>
 

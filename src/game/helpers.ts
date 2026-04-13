@@ -98,6 +98,23 @@ function isEnemy(state: GameState, from: number, to: number) {
     if (f.role === 'SHERIFF' || f.role === 'DEPUTY')
         return t.role === 'OUTLAW' || t.role === 'RENEGADE';
     if (f.role === 'OUTLAW') return t.role === 'SHERIFF' || t.role === 'DEPUTY';
+    if (f.role === 'RENEGADE') {
+        const numberOfDeputies = state.players.filter(
+            (p) => p.role === 'DEPUTY',
+        ).length;
+        const numberOfOutlaws = state.players.filter(
+            (p) => p.role === 'OUTLAW',
+        ).length;
+        if (numberOfDeputies === numberOfOutlaws) {
+            return t.role === 'DEPUTY' || t.role === 'OUTLAW';
+        } else if (numberOfDeputies > numberOfOutlaws) {
+            return t.role === 'DEPUTY';
+        } else if (numberOfDeputies === 0 && numberOfOutlaws === 0) {
+            return t.role === 'SHERIFF';
+        } else {
+            return t.role === 'OUTLAW';
+        }
+    }
     return t.role !== 'RENEGADE';
 }
 
