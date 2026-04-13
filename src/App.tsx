@@ -409,18 +409,33 @@ export default function App() {
                         payload: picked,
                     });
 
-                    dispatch({
-                        type: 'TRIGGER_FLOAT',
-                        cardKey: picked.key,
-                        fromId: currentCardPickerTarget.id,
-                        toId: currentCardPicker.id,
-                    });
+                    if (G.phase === 'panic') {
+                        dispatch({
+                            type: 'TRIGGER_FLOAT',
+                            cardKey: picked.key,
+                            fromId: currentCardPickerTarget.id,
+                            toId: currentCardPicker.id,
+                        });
 
-                    // Show a quick banner so the human knows what the AI took
-                    await showBanner(
-                        `${currentCardPicker.name} picks ${CARD_DEFS[picked.key]?.name || picked.key}.`,
-                        700,
-                    );
+                        // Show a quick banner so the human knows what the AI took
+                        await showBanner(
+                            `${currentCardPicker.name} picks ${CARD_DEFS[picked.key]?.name || picked.key}.`,
+                            700,
+                        );
+                    } else {
+                        dispatch({
+                            type: 'TRIGGER_FLOAT',
+                            cardKey: picked.key,
+                            fromId: currentCardPickerTarget.id,
+                            toId: 'discard',
+                        });
+
+                        // Show a quick banner so the human knows what the AI took
+                        await showBanner(
+                            `${currentCardPicker.name} discard a ${CARD_DEFS[picked.key]?.name || picked.key} from ${currentCardPickerTarget.name}.`,
+                            700,
+                        );
+                    }
                 }
             }, 1200); // Slightly longer delay than reaction to feel more "natural"
 
@@ -570,6 +585,74 @@ export default function App() {
                             dispatch({
                                 type: 'PLAY_CARD',
                                 cardKey: 'panic',
+                                sourceId: player.id,
+                                targetId: target.id,
+                            });
+                        }
+                    } else {
+                        return;
+                    }
+                }, 1200);
+                return () => {
+                    clearTimeout(aiDelay);
+                };
+            }
+
+            if (player.hand.includes('catbalou')) {
+                const aiDelay = setTimeout(async () => {
+                    const targets = G.players.filter(
+                        (q) =>
+                            q.alive &&
+                            q.id !== player.id &&
+                            inRange(G.players, player.id, q.id) &&
+                            (q.hand.length > 0 || q.inPlay.length > 0),
+                    );
+
+                    if (targets.length) {
+                        const enemies = targets.filter((q) =>
+                            isEnemy(G, player.id, q.id),
+                        );
+                        const pool = enemies.length ? enemies : targets;
+
+                        const mustangBlockers = pool.filter(
+                            (q) =>
+                                q.inPlay.includes('mustang') &&
+                                !inRange(G.players, player.id, q.id),
+                        );
+
+                        const inPlayTargets = pool.filter(
+                            (q) => q.inPlay.length > 0,
+                        );
+
+                        const target = mustangBlockers.length
+                            ? mustangBlockers[
+                                  Math.floor(
+                                      Math.random() * mustangBlockers.length,
+                                  )
+                              ]
+                            : inPlayTargets.length
+                              ? inPlayTargets[
+                                    Math.floor(
+                                        Math.random() * inPlayTargets.length,
+                                    )
+                                ]
+                              : pool[Math.floor(Math.random() * pool.length)];
+
+                        const picked = aiPickCardFrom(G, target, player);
+
+                        if (picked !== null) {
+                            dispatch({
+                                type: 'TRIGGER_FLOAT',
+                                cardKey: 'catbalou',
+                                fromId: player.id,
+                                toId: target.id,
+                            });
+
+                            await wait(1000);
+
+                            dispatch({
+                                type: 'PLAY_CARD',
+                                cardKey: 'catbalou',
                                 sourceId: player.id,
                                 targetId: target.id,
                             });

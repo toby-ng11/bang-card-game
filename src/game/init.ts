@@ -59,7 +59,7 @@ function initGame(): GameState {
             maxHp: role === 'SHERIFF' ? 5 : 4,
             hand:
                 names[i] === 'Billy'
-                    ? ['panic']
+                    ? ['catbalou']
                     : names[i] === 'Rosa'
                       ? ['beer']
                       : initialHand,
@@ -100,6 +100,7 @@ function initGame(): GameState {
         cardPickerResolve: null,
         cardPickerLabel: '',
         activePopups: [],
+        floatingCard: null,
     };
 }
 
