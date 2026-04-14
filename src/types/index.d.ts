@@ -13,7 +13,8 @@ export type CardKey =
     | 'stagecoach'
     | 'wellsfargo'
     | 'mustang'
-    | 'scope';
+    | 'scope'
+    | 'barrel';
 
 export type CardType = 'brown' | 'blue';
 

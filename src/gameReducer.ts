@@ -1,5 +1,5 @@
 import { CARD_DEFS } from './definitions/cards';
-import { dealN, shuffle } from './game/helpers';
+import { dealN } from './game/helpers';
 import {
     CardKey,
     CardPick,
@@ -68,6 +68,7 @@ type GameAction =
     | { type: 'RESOLVE_INDIANS'; playerId: number }
     | { type: 'RESOLVE_DUEL'; playerId: number }
     | { type: 'RESOLVE_SALOON'; playerId: number }
+    | { type: 'RESOLVE_BARREL'; playerId: number }
     | { type: 'FINISH_ACTION' }
     | {
           type: 'PLAY_CARD';
@@ -423,7 +424,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             let updatedPlayers = state.players.map((p) => {
                 if (p.id === targetId) {
                     if (source === 'hand') {
-                        const newHand = [...shuffle(p.hand)];
+                        const newHand = [...p.hand];
                         newHand.splice(idx, 1);
                         return { ...p, hand: newHand };
                     } else {
@@ -573,6 +574,24 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             return {
                 ...state,
                 reactorId: remainingQueue,
+            };
+        }
+
+        case 'RESOLVE_BARREL': {
+            if (state.pendingAction?.type !== 'bang') return { ...state };
+            const { playerId } = action;
+            const remainingQueue = removeElementFromArray(
+                playerId,
+                state.reactorId,
+            );
+
+            return {
+                ...state,
+                reactorId: remainingQueue,
+                log: [
+                    `${state.players[playerId].name} successfully use Barrel and dodge a BANG!.`,
+                    ...state.log,
+                ],
             };
         }
 
@@ -928,8 +947,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                             state.players[
                                 (startIndex + i) % state.players.length
                             ];
-                        if (player.hp > 0 && player.id !== sourceId)
-                            newReactors.push(player.id);
+                        if (player.hp > 0) newReactors.push(player.id);
                     }
 
                     return {
@@ -991,6 +1009,29 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         players: applyMustang,
                         log: [
                             `${sourcePlayer.name} play Scope! ${sourcePlayer.name} will see everyone at -1 distance.`,
+                            ...state.log,
+                        ],
+                    };
+                }
+
+                case 'barrel': {
+                    const newPlayerState = removeCardFromHand(
+                        cardKey,
+                        sourceId,
+                        state,
+                    );
+
+                    const applyBarrel = newPlayerState.map((p) =>
+                        p.id === sourceId
+                            ? { ...p, inPlay: [cardKey, ...p.inPlay] }
+                            : p,
+                    );
+
+                    return {
+                        ...state,
+                        players: applyBarrel,
+                        log: [
+                            `${sourcePlayer.name} play Barrel! BANG! will have 25% chance Missed! if target them.`,
                             ...state.log,
                         ],
                     };
@@ -1101,11 +1142,19 @@ function handleElimination(
         gameWinner = 'SHERIFF';
     }
 
+    let next = (state.turn + 1) % state.players.length;
+    let att = 0;
+    while (!state.players[next].alive && att < state.players.length) {
+        next = (next + 1) % state.players.length;
+        att++;
+    }
+
     return {
         ...state,
         players: updatedPlayers,
         discardPile: newDiscard,
         over: gameOverMessage !== null ? true : false,
+        turn: killerId === deadId ? next : state.turn, // self kill
         winner: gameWinner,
         phase: gameOverMessage
             ? 'game-over'

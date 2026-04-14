@@ -1,4 +1,5 @@
 import { CARD_DEFS } from '@/definitions/cards';
+import { shuffle } from '@/game/helpers';
 import { cn } from '@/lib/utils';
 import { CardPick, CardPickSource, Player } from '@/types';
 import { AnimatePresence, motion } from 'motion/react';
@@ -13,11 +14,13 @@ interface CardPickerProps {
 
 export default function CardPicker({ target, label, onPick }: CardPickerProps) {
     const allCards: CardPick[] = [
-        ...target.hand.map((key, idx) => ({
-            source: 'hand' as CardPickSource,
-            idx,
-            key,
-        })),
+        ...shuffle(
+            target.hand.map((key, idx) => ({
+                source: 'hand' as CardPickSource,
+                idx,
+                key,
+            })),
+        ),
         ...target.inPlay.map((key, idx) => ({
             source: 'inPlay' as CardPickSource,
             idx,

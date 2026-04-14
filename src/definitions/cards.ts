@@ -85,6 +85,12 @@ const CARD_DEFS: Record<CardKey, CardDef> = {
         desc: 'You view others as distance -1.',
         color: 'blue',
     },
+    barrel: {
+        name: 'Barrel',
+        icon: '🛢️',
+        desc: 'BANG! targets you will have 25% chance Missed!',
+        color: 'blue',
+    },
 };
 
 export { CARD_DEFS };

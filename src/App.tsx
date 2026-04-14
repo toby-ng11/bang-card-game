@@ -19,7 +19,7 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { FloatAnimation } from './components/FloatLayer';
 import { BattleLogPanel } from './components/GameLogPanel';
 import PopupLayer from './components/PopupLayer';
-import { aiPickCardFrom } from './game/ai';
+import { aiPickCardFrom, getAIDiscardCard } from './game/ai';
 
 export default function App() {
     const [G, dispatch] = useReducer(gameReducer, null, initGame);
@@ -273,23 +273,33 @@ export default function App() {
 
         if (G.phase === 'bang' && reactor) {
             const aiDelay = setTimeout(async () => {
-                const hasMissed = reactor.hand.includes('missed');
-                if (hasMissed) {
-                    triggerPopup(reactor.id, 'missed', 'play');
+                const hasBarrel = reactor.inPlay.includes('barrel');
+                const chance = 0.25;
+                if (hasBarrel && Math.random() < chance) {
+                    triggerPopup(reactor.id, 'barrel', 'heal');
                     dispatch({
-                        type: 'PLAY_CARD',
-                        cardKey: 'missed',
-                        sourceId: reactor.id,
-                        targetId: G.pendingAction?.targetId ?? null,
+                        type: 'RESOLVE_BARREL',
+                        playerId: reactor.id,
                     });
                 } else {
-                    triggerPopup(reactor.id, 'bang', 'damage');
-                    dispatch({
-                        type: 'TAKE_DAMAGE',
-                        sourceId: G.pendingAction?.sourceId ?? null,
-                        targetId: reactor.id,
-                        damageAmount: 1,
-                    });
+                    const hasMissed = reactor.hand.includes('missed');
+                    if (hasMissed) {
+                        triggerPopup(reactor.id, 'missed', 'play');
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'missed',
+                            sourceId: reactor.id,
+                            targetId: G.pendingAction?.targetId ?? null,
+                        });
+                    } else {
+                        triggerPopup(reactor.id, 'bang', 'damage');
+                        dispatch({
+                            type: 'TAKE_DAMAGE',
+                            sourceId: G.pendingAction?.sourceId ?? null,
+                            targetId: reactor.id,
+                            damageAmount: 1,
+                        });
+                    }
                 }
                 dispatch({ type: 'FINISH_ACTION' });
             }, 1000);
@@ -299,9 +309,7 @@ export default function App() {
 
         if (G.phase === 'gatling' && reactor) {
             const aiDelay = setTimeout(async () => {
-                const hasMissed = reactor.hand.includes('missed');
                 const sourceId = G.pendingAction?.sourceId;
-
                 if (sourceId !== undefined) {
                     dispatch({
                         type: 'TRIGGER_FLOAT',
@@ -313,26 +321,38 @@ export default function App() {
 
                 await wait(1000);
 
-                if (hasMissed) {
-                    // Trigger your beautiful popup!
-                    triggerPopup(reactor.id, 'missed', 'play');
-
+                const hasBarrel = reactor.inPlay.includes('barrel');
+                const chance = 0.25;
+                if (hasBarrel && Math.random() < chance) {
+                    triggerPopup(reactor.id, 'barrel', 'heal');
                     dispatch({
-                        type: 'PLAY_CARD',
-                        cardKey: 'missed',
-                        sourceId: reactor.id,
-                        targetId: G.pendingAction?.targetId ?? null,
+                        type: 'RESOLVE_BARREL',
+                        playerId: reactor.id,
                     });
                 } else {
-                    // Take damage popup
-                    triggerPopup(reactor.id, 'gatling', 'damage');
+                    const hasMissed = reactor.hand.includes('missed');
 
-                    dispatch({
-                        type: 'TAKE_DAMAGE',
-                        sourceId: G.pendingAction?.sourceId ?? null,
-                        targetId: reactor.id,
-                        damageAmount: 1,
-                    });
+                    if (hasMissed) {
+                        // Trigger your beautiful popup!
+                        triggerPopup(reactor.id, 'missed', 'play');
+
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'missed',
+                            sourceId: reactor.id,
+                            targetId: G.pendingAction?.targetId ?? null,
+                        });
+                    } else {
+                        // Take damage popup
+                        triggerPopup(reactor.id, 'gatling', 'damage');
+
+                        dispatch({
+                            type: 'TAKE_DAMAGE',
+                            sourceId: G.pendingAction?.sourceId ?? null,
+                            targetId: reactor.id,
+                            damageAmount: 1,
+                        });
+                    }
                 }
                 dispatch({ type: 'FINISH_ACTION' });
             }, 1000);
@@ -347,7 +367,7 @@ export default function App() {
                 if (sourceId !== undefined) {
                     dispatch({
                         type: 'TRIGGER_FLOAT',
-                        cardKey: 'gatling',
+                        cardKey: 'indians',
                         fromId: sourceId,
                         toId: reactor.id,
                     });
@@ -442,29 +462,29 @@ export default function App() {
             currentGeneralStorePicker &&
             !currentGeneralStorePicker.isHuman
         ) {
-            const aiDelay = setTimeout(async () => {
-                // AI Logic: Priority is 'bang', otherwise take the first available card
-                const availableCards = G.generalStoreCards;
-                if (!availableCards || availableCards.length === 0) return;
+            const availableCards = G.generalStoreCards;
+            if (availableCards && availableCards.length > 0) {
+                const aiDelay = setTimeout(async () => {
+                    // AI Logic: Priority is 'bang', otherwise take the first available card
+                    const pick = availableCards.includes('bang')
+                        ? 'bang'
+                        : availableCards[0];
 
-                const pick = availableCards.includes('bang')
-                    ? 'bang'
-                    : availableCards[0];
+                    dispatch({
+                        type: 'RESOLVE_GENERAL_STORE_PICK',
+                        cardKey: pick,
+                        playerId: currentGeneralStorePicker.id,
+                    });
 
-                dispatch({
-                    type: 'RESOLVE_GENERAL_STORE_PICK',
-                    cardKey: pick,
-                    playerId: currentGeneralStorePicker.id,
-                });
+                    // Show a quick banner so the human knows what the AI took
+                    await showBanner(
+                        `${currentGeneralStorePicker.name} picks ${CARD_DEFS[pick]?.name || pick}.`,
+                        700,
+                    );
+                }, 1200); // Slightly longer delay than reaction to feel more "natural"
 
-                // Show a quick banner so the human knows what the AI took
-                await showBanner(
-                    `${currentGeneralStorePicker.name} picks ${CARD_DEFS[pick]?.name || pick}.`,
-                    700,
-                );
-            }, 1200); // Slightly longer delay than reaction to feel more "natural"
-
-            return () => clearTimeout(aiDelay);
+                return () => clearTimeout(aiDelay);
+            }
         }
 
         const currentCardPickerId = G.pendingAction?.sourceId;
@@ -571,36 +591,36 @@ export default function App() {
 
         const alivePlayers = G.players.filter((p) => p.alive);
         if (G.phase === 'play') {
-            if (
-                player.hp <= 2 &&
-                alivePlayers.length > 2 &&
-                player.hand.includes('beer')
-            ) {
-                const aiDelay = setTimeout(() => {
-                    triggerPopup(player.id, 'beer', 'heal');
-                    dispatch({
-                        type: 'PLAY_CARD',
-                        cardKey: 'beer',
-                        sourceId: player.id,
-                        targetId: null,
-                    });
-                }, 1500);
-                return () => clearTimeout(aiDelay);
+            if (player.hand.includes('beer')) {
+                if (player.hp <= 2 && alivePlayers.length > 2) {
+                    const aiDelay = setTimeout(() => {
+                        triggerPopup(player.id, 'beer', 'heal');
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'beer',
+                            sourceId: player.id,
+                            targetId: null,
+                        });
+                    }, 1500);
+                    return () => clearTimeout(aiDelay);
+                }
             }
 
-            if (player.hp < player.maxHp && player.hand.includes('saloon')) {
-                const aiDelay = setTimeout(() => {
-                    // Trigger your beautiful popup!
-                    triggerPopup(player.id, 'saloon', 'play');
+            if (player.hand.includes('saloon')) {
+                if (player.hp < player.maxHp) {
+                    const aiDelay = setTimeout(() => {
+                        // Trigger your beautiful popup!
+                        triggerPopup(player.id, 'saloon', 'play');
 
-                    dispatch({
-                        type: 'PLAY_CARD',
-                        cardKey: 'saloon',
-                        sourceId: player.id,
-                        targetId: null,
-                    });
-                }, 1500);
-                return () => clearTimeout(aiDelay);
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'saloon',
+                            sourceId: player.id,
+                            targetId: null,
+                        });
+                    }, 1500);
+                    return () => clearTimeout(aiDelay);
+                }
             }
 
             if (player.hand.includes('generalstore')) {
@@ -671,38 +691,52 @@ export default function App() {
                 return () => clearTimeout(aiDelay);
             }
 
-            if (
-                player.hand.includes('mustang') &&
-                !player.inPlay.includes('mustang')
-            ) {
-                const aiDelay = setTimeout(async () => {
-                    triggerPopup(player.id, 'mustang', 'play');
+            if (player.hand.includes('mustang')) {
+                if (!player.inPlay.includes('mustang')) {
+                    const aiDelay = setTimeout(async () => {
+                        triggerPopup(player.id, 'mustang', 'play');
 
-                    dispatch({
-                        type: 'PLAY_CARD',
-                        cardKey: 'mustang',
-                        sourceId: player.id,
-                        targetId: null,
-                    });
-                }, 1500);
-                return () => clearTimeout(aiDelay);
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'mustang',
+                            sourceId: player.id,
+                            targetId: null,
+                        });
+                    }, 1500);
+                    return () => clearTimeout(aiDelay);
+                }
             }
 
-            if (
-                player.hand.includes('scope') &&
-                !player.inPlay.includes('scope')
-            ) {
-                const aiDelay = setTimeout(async () => {
-                    triggerPopup(player.id, 'scope', 'play');
+            if (player.hand.includes('scope')) {
+                if (!player.inPlay.includes('scope')) {
+                    const aiDelay = setTimeout(async () => {
+                        triggerPopup(player.id, 'scope', 'play');
 
-                    dispatch({
-                        type: 'PLAY_CARD',
-                        cardKey: 'scope',
-                        sourceId: player.id,
-                        targetId: null,
-                    });
-                }, 1500);
-                return () => clearTimeout(aiDelay);
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'scope',
+                            sourceId: player.id,
+                            targetId: null,
+                        });
+                    }, 1500);
+                    return () => clearTimeout(aiDelay);
+                }
+            }
+
+            if (player.hand.includes('barrel')) {
+                if (!player.inPlay.includes('barrel')) {
+                    const aiDelay = setTimeout(async () => {
+                        triggerPopup(player.id, 'barrel', 'play');
+
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'barrel',
+                            sourceId: player.id,
+                            targetId: null,
+                        });
+                    }, 1500);
+                    return () => clearTimeout(aiDelay);
+                }
             }
 
             if (player.hand.includes('panic')) {
@@ -849,7 +883,7 @@ export default function App() {
                 return () => clearTimeout(aiDelay);
             }
 
-            if (player.hand.includes('duel') && player.hand.includes('bang')) {
+            if (player.hand.includes('duel')) {
                 const duelTarget = (() => {
                     const enemies = G.players.filter(
                         (q) =>
@@ -861,7 +895,7 @@ export default function App() {
                     return enemies.reduce((a, b) => (b.hp < a.hp ? b : a));
                 })();
 
-                if (duelTarget) {
+                if (duelTarget && player.hand.includes('bang')) {
                     const aiDelay = setTimeout(async () => {
                         dispatch({
                             type: 'TRIGGER_FLOAT',
@@ -923,14 +957,11 @@ export default function App() {
             const maxCards = player.hp;
             if (player.hand.length > maxCards) {
                 const aiDelay = setTimeout(async () => {
-                    const cardIdx = Math.floor(
-                        Math.random() * player.hand.length,
-                    );
-                    const cardKey = player.hand[cardIdx];
+                    const cardToDiscard = getAIDiscardCard(G, player.id);
 
                     dispatch({
                         type: 'TRIGGER_FLOAT',
-                        cardKey: cardKey,
+                        cardKey: cardToDiscard,
                         fromId: player.id,
                         toId: 'discard',
                     });
@@ -940,7 +971,7 @@ export default function App() {
                     dispatch({
                         type: 'DISCARD_A_CARD_FROM_HAND',
                         playerId: player.id,
-                        cardKey: cardKey,
+                        cardKey: cardToDiscard,
                     });
                 }, 1500);
                 return () => {

@@ -15,6 +15,7 @@ const CARD_POOL: CardKey[] = [
     ...Array<CardKey>(2).fill('generalstore'),
     ...Array<CardKey>(2).fill('mustang'),
     ...Array<CardKey>(1).fill('scope'),
+    ...Array<CardKey>(2).fill('barrel'),
 ];
 
 export { CARD_POOL };
