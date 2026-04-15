@@ -1,3 +1,4 @@
+import { CHARACTER_DEFS, CharacterKey } from '@/definitions/character';
 import { CardKey } from '@/types';
 
 const CARD_POOL: CardKey[] = [
@@ -23,4 +24,8 @@ const CARD_POOL: CardKey[] = [
     ...Array<CardKey>(2).fill('volcanic'),
 ];
 
-export { CARD_POOL };
+const CHARACTER_POOL: CharacterKey[] = Object.keys(
+    CHARACTER_DEFS,
+) as CharacterKey[];
+
+export { CARD_POOL, CHARACTER_POOL };

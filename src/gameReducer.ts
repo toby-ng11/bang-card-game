@@ -294,6 +294,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 ...state,
                 pendingAction: isReacting ? state.pendingAction : null,
                 phase: isReacting ? state.phase : 'play',
+                selectedCard: null,
             };
         }
 

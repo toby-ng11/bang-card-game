@@ -1,3 +1,5 @@
+import { CharacterKey } from '@/definitions/character';
+
 // ── Cards ────────────────────────────────────────────────────────
 export type CardKey =
     | 'bang'
@@ -49,6 +51,7 @@ export interface Player {
     id: number;
     name: string;
     role: Role;
+    character: CharacterKey;
     hp: number;
     maxHp: number;
     hand: CardKey[];

@@ -1,9 +1,11 @@
 import { CARD_DEFS } from '@/definitions/cards';
+import { CHARACTER_DEFS } from '@/definitions/character';
 import { distance, inRange } from '@/game/helpers';
 import { cn } from '@/lib/utils';
 import { CardKey, Player, Role } from '@/types';
 import { cva } from 'class-variance-authority';
 import { Badge } from './ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface PlayerSlotProps {
     p: Player;
@@ -74,6 +76,20 @@ export default function PlayerSlot({
                 <div className="absolute inset-0 animate-ping rounded-lg border-2 border-red-400"></div>
             )}
             <div className="flex flex-col gap-1.5">
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <div className="text-[10px] leading-none font-bold tracking-widest text-amber-600/80 uppercase">
+                            {CHARACTER_DEFS[p.character].name}
+                        </div>
+                    </TooltipTrigger>
+                    <TooltipContent
+                        side="top"
+                        className="bg-amber-200 text-black"
+                    >
+                        {CHARACTER_DEFS[p.character].desc}
+                    </TooltipContent>
+                </Tooltip>
+
                 {/* Name row */}
                 <div className="flex flex-wrap items-center gap-2 text-lg font-medium">
                     {p.name}

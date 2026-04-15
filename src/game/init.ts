@@ -1,4 +1,5 @@
-import { CARD_POOL } from '@/definitions/deck';
+import { CHARACTER_DEFS, CharacterKey } from '@/definitions/character';
+import { CARD_POOL, CHARACTER_POOL } from '@/definitions/deck';
 import { CardKey, GameState, Player, Role } from '@/types';
 import { shuffle } from './helpers';
 
@@ -28,6 +29,8 @@ function initGame(): GameState {
         ...shuffle<Role>(['DEPUTY', 'OUTLAW', 'OUTLAW', 'OUTLAW', 'RENEGADE']),
     ];
 
+    const charPool = shuffle<CharacterKey>([...CHARACTER_POOL]);
+
     const deck = shuffle<CardKey>([...CARD_POOL]);
 
     const names = ['You', 'Billy', 'Rosa', 'Duke', 'Matt', 'Cam'];
@@ -49,16 +52,22 @@ function initGame(): GameState {
     // for testing
     const players: Player[] = roles.map((role, i) => {
         const isHuman = i === 0;
-        const initialHand = dealN(deck, role === 'SHERIFF' ? 5 : 4);
+        const characterKey = charPool.pop()!;
+        const charInfo = CHARACTER_DEFS[characterKey];
+
+        const hpBonus = role === 'SHERIFF' ? 1 : 0;
+        const finalMaxHp = charInfo.life_points + hpBonus;
+
+        const initialHand = dealN(deck, finalMaxHp);
 
         return {
             id: i,
             name: names[i],
             role,
+            character: characterKey,
             hp: role === 'SHERIFF' ? 5 : 4,
             maxHp: role === 'SHERIFF' ? 5 : 4,
             hand: initialHand,
-
             alive: true,
             isHuman,
             inPlay: [],
