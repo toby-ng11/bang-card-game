@@ -750,11 +750,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         }
 
                         case 'bang': {
-                            //const hasVolcanic = state.players[shooterIdx].inPlay.includes('volcanic');
                             if (targetId === null) return { ...state };
                             else {
+                                const hasVolcanic =
+                                    state.players[sourceId].inPlay.includes(
+                                        'volcanic',
+                                    );
                                 const targetPlayer = state.players[targetId];
-                                if (state.bangUsed) {
+                                if (state.bangUsed && !hasVolcanic) {
                                     return {
                                         ...state,
                                         log: [
@@ -1010,13 +1013,28 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                             };
                         }
 
-                        case 'schofield': {
+                        case 'schofield':
+                        case 'remington':
+                        case 'revcarabine':
+                        case 'winchester': {
                             return {
                                 ...state,
                                 players: newPlayerState,
                                 discardPile: [...newDiscardPile],
                                 log: [
-                                    `${sourcePlayer.name} play Schofield! Now they can BANG! targets up to distance 2.`,
+                                    `${sourcePlayer.name} play Schofield! Now they can BANG! targets up to distance ${cardDef.range}.`,
+                                    ...state.log,
+                                ],
+                            };
+                        }
+
+                        case 'volcanic': {
+                            return {
+                                ...state,
+                                players: newPlayerState,
+                                discardPile: [...newDiscardPile],
+                                log: [
+                                    `${sourcePlayer.name} play Volcanic! Now they can play any number of BANG! in turn.`,
                                     ...state.log,
                                 ],
                             };

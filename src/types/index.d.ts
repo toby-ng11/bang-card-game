@@ -15,7 +15,11 @@ export type CardKey =
     | 'mustang'
     | 'scope'
     | 'barrel'
-    | 'schofield';
+    | 'schofield'
+    | 'remington'
+    | 'revcarabine'
+    | 'winchester'
+    | 'volcanic';
 
 export type CardType = 'brown' | 'blue';
 

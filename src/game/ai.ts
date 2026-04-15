@@ -106,7 +106,11 @@ const getAIDiscardCard = (G: GameState, playerId: number): CardKey => {
         //if (cardKey === 'scope' || cardKey === 'volcanic') score += 10;
         if (cardKey === 'scope') score += 10;
 
-        if (cardKey === 'schofield') {
+        const GUNS = Object.entries(CARD_DEFS)
+            .filter(([, card]) => card.weapon)
+            .map(([key]) => key);
+
+        if (GUNS.includes(cardKey)) {
             const currentWeapon = player.inPlay.find(
                 (c) => CARD_DEFS[c].weapon,
             );

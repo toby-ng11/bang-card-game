@@ -127,7 +127,12 @@ export default function PlayerHand({
                                     )}
                                 </motion.div>
                             </TooltipTrigger>
-                            <TooltipContent side="top">{c.desc}</TooltipContent>
+                            <TooltipContent
+                                side="top"
+                                className="bg-amber-200 text-black"
+                            >
+                                {c.desc}
+                            </TooltipContent>
                         </Tooltip>
                     );
                 })}

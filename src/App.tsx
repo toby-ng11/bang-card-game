@@ -761,22 +761,6 @@ export default function App() {
                 }
             }
 
-            if (player.hand.includes('schofield')) {
-                if (!player.inPlay.includes('schofield')) {
-                    const aiDelay = setTimeout(async () => {
-                        triggerPopup(player.id, 'schofield', 'play');
-
-                        dispatch({
-                            type: 'PLAY_CARD',
-                            cardKey: 'schofield',
-                            sourceId: player.id,
-                            targetId: null,
-                        });
-                    }, 1500);
-                    return () => clearTimeout(aiDelay);
-                }
-            }
-
             if (player.hand.includes('panic')) {
                 const canPlayPanic = (() => {
                     const targets = G.players.filter(
@@ -958,7 +942,39 @@ export default function App() {
                 }
             }
 
-            if (player.hand.includes('bang') && !G.bangUsed) {
+            const GUNS = Object.entries(CARD_DEFS)
+                .filter(([, card]) => card.weapon)
+                .map(([key]) => key);
+            const gunInHand = player.hand.find((card) => GUNS.includes(card));
+            const gunInPlay = player.inPlay.find((card) => GUNS.includes(card));
+
+            if (gunInHand) {
+                const handGunRange = CARD_DEFS[gunInHand].range ?? 1;
+                const playGunRange = gunInPlay
+                    ? (CARD_DEFS[gunInPlay].range ?? 1)
+                    : 1;
+                if (
+                    (!gunInPlay || gunInPlay !== gunInHand) &&
+                    (handGunRange > playGunRange || gunInHand === 'volcanic')
+                ) {
+                    const aiDelay = setTimeout(async () => {
+                        triggerPopup(player.id, gunInHand, 'play');
+
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: gunInHand,
+                            sourceId: player.id,
+                            targetId: null,
+                        });
+                    }, 1500);
+                    return () => clearTimeout(aiDelay);
+                }
+            }
+
+            if (player.hand.includes('bang')) {
+                const canUseBang =
+                    !G.bangUsed || player.inPlay.includes('volcanic');
+
                 const bangTarget = (() => {
                     const enemies = G.players.filter(
                         (q) =>
@@ -971,7 +987,7 @@ export default function App() {
                     return enemies.reduce((a, b) => (b.hp < a.hp ? b : a));
                 })();
 
-                if (bangTarget) {
+                if (bangTarget && canUseBang) {
                     const aiDelay = setTimeout(async () => {
                         dispatch({
                             type: 'TRIGGER_FLOAT',

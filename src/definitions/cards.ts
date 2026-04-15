@@ -100,6 +100,38 @@ const CARD_DEFS: Record<CardKey, CardDef> = {
         weapon: true,
         range: 2,
     },
+    remington: {
+        name: 'Remington',
+        icon: '🔫',
+        desc: 'Your BANG! can target players at distance 3.',
+        color: 'blue',
+        weapon: true,
+        range: 3,
+    },
+    revcarabine: {
+        name: 'Rev. Carabine',
+        icon: '🔫',
+        desc: 'Your BANG! can target players at distance 4.',
+        color: 'blue',
+        weapon: true,
+        range: 4,
+    },
+    winchester: {
+        name: 'Winchester',
+        icon: '🔫',
+        desc: 'Your BANG! can target players at distance 5.',
+        color: 'blue',
+        weapon: true,
+        range: 5,
+    },
+    volcanic: {
+        name: 'Volcanic',
+        icon: '🔫',
+        desc: 'You can play any number of BANG! during your turn.',
+        color: 'blue',
+        weapon: true,
+        range: 1,
+    },
 };
 
 export { CARD_DEFS };
