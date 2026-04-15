@@ -2,7 +2,12 @@ import { CARD_DEFS } from '@/definitions/cards';
 import { inRange, isEnemy } from '@/game/helpers';
 import { CardKey, CardPick, GameState, Player } from '@/types';
 
-function aiPickCardFrom(state: GameState, target: Player, perspective: Player) {
+function aiPickCardFrom(
+    state: GameState,
+    target: Player,
+    perspective: Player,
+    actionCardKey: CardKey,
+) {
     // perspective = the AI player doing the action
     const allCards: CardPick[] = [
         ...target.hand.map((c, i) => ({
@@ -23,22 +28,45 @@ function aiPickCardFrom(state: GameState, target: Player, perspective: Player) {
     const scope = allCards.find((c) => c.key === 'scope');
     const barrel = allCards.find((c) => c.key === 'barrel');
 
-    // if target has mustang and AI can't reach them, discard it
-    if (mustang && !inRange(state.players, perspective.id, target.id))
-        return mustang;
-    // if target has scope and is an enemy, discard it
-    if (scope && isEnemy(state, perspective.id, target.id)) return scope;
+    const weapon = allCards.find((c) => {
+        const def = CARD_DEFS[c.key];
+        return def?.weapon && c.source === 'inPlay';
+    });
+
     // if target has barrel, discard it so BANG! lands reliably
     if (barrel && isEnemy(state, perspective.id, target.id)) return barrel;
+    // if target has mustang and AI can't reach them, discard it
+    if (mustang && !inRange(state.players, perspective.id, target.id, 'panic'))
+        return mustang;
+    // if target has scope and is an enemy, discard it
+    if (weapon && isEnemy(state, perspective.id, target.id)) {
+        const myWeapon = perspective.inPlay.find((c) => CARD_DEFS[c].weapon);
+        const myRange = (myWeapon ? CARD_DEFS[myWeapon].range : 1) ?? 1;
+        const targetRange = CARD_DEFS[weapon.key].range || 1;
+
+        // If stealing: Take their gun if it's better than ours
+        if (actionCardKey === 'panic' && targetRange > myRange) return weapon;
+
+        // If discarding: Break their gun if it's a threat (range > 1)
+        if (actionCardKey === 'catbalou' && targetRange > 1) return weapon;
+    }
+
+    if (scope && isEnemy(state, perspective.id, target.id)) return scope;
 
     // otherwise pick a random hand card (don't peek at face-down hand)
     const handCards = allCards.filter((c) => c.source === 'hand');
     const inPlayCards = allCards.filter((c) => c.source === 'inPlay');
 
     // prefer stealing hand cards for panic, inPlay for catbalou
-    return handCards.length
-        ? handCards[Math.floor(Math.random() * handCards.length)]
-        : inPlayCards[Math.floor(Math.random() * inPlayCards.length)];
+    if (actionCardKey === 'panic') {
+        return handCards.length
+            ? handCards[Math.floor(Math.random() * handCards.length)]
+            : inPlayCards[0];
+    } else {
+        return inPlayCards.length
+            ? inPlayCards[Math.floor(Math.random() * inPlayCards.length)]
+            : handCards[0];
+    }
 }
 
 const getAIDiscardCard = (G: GameState, playerId: number): CardKey => {
@@ -77,6 +105,18 @@ const getAIDiscardCard = (G: GameState, playerId: number): CardKey => {
         // 5. Reach: Scopes/Volcanics are kept if enemies are alive
         //if (cardKey === 'scope' || cardKey === 'volcanic') score += 10;
         if (cardKey === 'scope') score += 10;
+
+        if (cardKey === 'schofield') {
+            const currentWeapon = player.inPlay.find(
+                (c) => CARD_DEFS[c].weapon,
+            );
+            const currentRange = currentWeapon
+                ? (CARD_DEFS[currentWeapon].range ?? 1)
+                : 1;
+
+            // Keep it if it improves our range
+            score += currentRange < 2 ? 12 : 2;
+        }
 
         return { cardKey, score, index };
     });

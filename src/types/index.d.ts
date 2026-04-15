@@ -14,7 +14,8 @@ export type CardKey =
     | 'wellsfargo'
     | 'mustang'
     | 'scope'
-    | 'barrel';
+    | 'barrel'
+    | 'schofield';
 
 export type CardType = 'brown' | 'blue';
 
@@ -23,6 +24,8 @@ export interface CardDef {
     icon: string;
     desc: string;
     color: CardType;
+    weapon?: boolean;
+    range?: number;
 }
 
 // ── Players ──────────────────────────────────────────────────────

@@ -1,3 +1,5 @@
+import { CARD_DEFS } from '@/definitions/cards';
+import { CARD_POOL } from '@/definitions/deck';
 import { GameAction } from '@/gameReducer';
 import { CardKey, CardPick, GameState, Player } from '@/types';
 
@@ -30,8 +32,23 @@ function distance(players: Player[], from: number, to: number): number {
     );
 }
 
-function inRange(players: Player[], from: number, to: number): boolean {
-    return distance(players, from, to) <= 1;
+function inRange(
+    players: Player[],
+    from: number,
+    to: number,
+    cardKey: CardKey,
+): boolean {
+    const sourcePlayer = players[from];
+    const weapon = sourcePlayer.inPlay
+        .map((cardKey) => CARD_DEFS[cardKey])
+        .find((card) => card?.weapon);
+
+    const reach =
+        cardKey === 'panic'
+            ? (CARD_DEFS[cardKey].range ?? 1)
+            : (weapon?.range ?? 1);
+
+    return distance(players, from, to) <= reach;
 }
 
 function refillDeck(state: GameState): GameState {
@@ -100,10 +117,10 @@ function isEnemy(state: GameState, from: number, to: number) {
     if (f.role === 'OUTLAW') return t.role === 'SHERIFF' || t.role === 'DEPUTY';
     if (f.role === 'RENEGADE') {
         const numberOfDeputies = state.players.filter(
-            (p) => p.role === 'DEPUTY',
+            (p) => p.alive && p.role === 'DEPUTY',
         ).length;
         const numberOfOutlaws = state.players.filter(
-            (p) => p.role === 'OUTLAW',
+            (p) => p.alive && p.role === 'OUTLAW',
         ).length;
         if (numberOfDeputies === numberOfOutlaws) {
             return t.role === 'DEPUTY' || t.role === 'OUTLAW';
@@ -118,6 +135,93 @@ function isEnemy(state: GameState, from: number, to: number) {
     return t.role !== 'RENEGADE';
 }
 
+function validateCardChecksum(state: GameState) {
+    // 1. Count cards in Deck and Discard
+    const deckCount = state.deck.length;
+    const discardCount = state.discardPile.length;
+
+    // 2. Count cards in every player's hand and in-play slots
+    const playerTotal = state.players.reduce((sum, player) => {
+        const handCount = player.hand.length;
+        const inPlayCount = player.inPlay.length;
+        return sum + handCount + inPlayCount;
+    }, 0);
+
+    // 3. Include special slots (General Store)
+    const generalStoreCount = state.generalStoreCards?.length || 0;
+
+    const grandTotal =
+        deckCount + discardCount + playerTotal + generalStoreCount;
+
+    console.table({
+        Deck: deckCount,
+        Discard: discardCount,
+        Players: playerTotal,
+        GeneralStore: generalStoreCount,
+        TOTAL: grandTotal,
+    });
+
+    const totalCards = CARD_POOL.length;
+    // Replace 80 with your actual starting deck size
+    if (grandTotal !== totalCards) {
+        console.error(
+            `🚨 CARD LEAK DETECTED! Expected ${totalCards}, found ${grandTotal}`,
+        );
+    }
+}
+
+function validateCardFrequencies(state: GameState) {
+    // 1. Define the expected counts from your CARD_POOL
+    const EXPECTED_COUNTS: Record<CardKey, number> = CARD_POOL.reduce(
+        (acc, card) => {
+            acc[card] = (acc[card] || 0) + 1;
+            return acc;
+        },
+        {} as Record<CardKey, number>,
+    );
+
+    // 2. Helper to collect all cards currently in play
+    const allCurrentCards: CardKey[] = [
+        ...state.deck,
+        ...state.discardPile,
+        ...state.players.flatMap((p) => [...p.hand, ...p.inPlay]),
+        ...(state.generalStoreCards || []),
+    ];
+
+    // 3. Count occurrences
+    const actualCounts: Record<string, number> = {};
+    allCurrentCards.forEach((key) => {
+        actualCounts[key] = (actualCounts[key] || 0) + 1;
+    });
+
+    // 4. Compare and Log
+    const report: Record<
+        string,
+        { Expected: number; Actual: number; Status: string }
+    > = {};
+    let hasError = false;
+
+    (Object.keys(EXPECTED_COUNTS) as CardKey[]).forEach((key) => {
+        const expected = EXPECTED_COUNTS[key];
+        const actual = actualCounts[key] || 0;
+
+        report[key] = {
+            Expected: expected,
+            Actual: actual,
+            Status: expected === actual ? '✅' : '❌',
+        };
+
+        if (expected !== actual) hasError = true;
+    });
+
+    if (hasError) {
+        console.error('🚨 CARD FREQUENCY MISMATCH!');
+        console.table(report);
+    } else {
+        console.log('💎 Card manifest is perfect.');
+    }
+}
+
 export {
     dealN,
     distance,
@@ -125,5 +229,7 @@ export {
     isEnemy,
     refillDeck,
     shuffle,
+    validateCardChecksum,
+    validateCardFrequencies,
     waitForCardPick,
 };

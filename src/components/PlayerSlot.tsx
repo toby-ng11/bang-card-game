@@ -42,10 +42,13 @@ export default function PlayerSlot({
         ['catbalou', 'duel'].includes(human.hand[selectedCard]);
 
     const isClickTarget =
+        selectedCard !== null &&
         targeting &&
         !p.isHuman &&
         p.alive &&
-        (canTargetAllPlayers ? true : inRange(players, human.id, p.id));
+        (canTargetAllPlayers
+            ? true
+            : inRange(players, human.id, p.id, human.hand[selectedCard]));
 
     const isCur = p.id === turn;
     const showRole = p.role === 'SHERIFF' || !p.alive || p.isHuman;
@@ -58,7 +61,7 @@ export default function PlayerSlot({
             onClick={() => onPlayerClick(p.id)}
             className={cn(
                 'player-row relative flex cursor-pointer flex-col rounded-lg border border-amber-800/50 bg-black/20 px-3 py-2 transition duration-300 ease-in-out hover:border-amber-600',
-                !p.alive && 'dead',
+                !p.alive && 'cursor-not-allowed opacity-40',
                 targeting &&
                     (isClickTarget
                         ? 'border-red-500/30 hover:border-red-500 hover:bg-red-400/30'

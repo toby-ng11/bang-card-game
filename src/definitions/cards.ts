@@ -36,6 +36,7 @@ const CARD_DEFS: Record<CardKey, CardDef> = {
         icon: '😱',
         desc: 'Steal a random card from an adjacent player.',
         color: 'brown',
+        range: 1,
     },
     catbalou: {
         name: 'Cat Balou',
@@ -90,6 +91,14 @@ const CARD_DEFS: Record<CardKey, CardDef> = {
         icon: '🛢️',
         desc: 'BANG! targets you will have 25% chance Missed!',
         color: 'blue',
+    },
+    schofield: {
+        name: 'Schofield',
+        icon: '🔫',
+        desc: 'Your BANG! can target players at distance 2.',
+        color: 'blue',
+        weapon: true,
+        range: 2,
     },
 };
 

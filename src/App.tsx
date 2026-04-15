@@ -10,7 +10,12 @@ import { Toaster } from '@/components/ui/sonner';
 import { CARD_DEFS } from '@/definitions/cards';
 import { showBanner, wait } from '@/game/animation';
 import { checkWin } from '@/game/combat';
-import { distance, inRange, isEnemy } from '@/game/helpers';
+import {
+    distance,
+    inRange,
+    isEnemy,
+    validateCardFrequencies,
+} from '@/game/helpers';
 import { initGame } from '@/game/init';
 import { gameReducer } from '@/gameReducer';
 import { CardKey, CardPick, FlashMap } from '@/types';
@@ -128,11 +133,26 @@ export default function App() {
             const cardKey = p.hand[state.selectedCard];
 
             // range check for range-dependent cards
-            const needsRange = ['bang', 'panic'].includes(cardKey);
-            if (needsRange && !inRange(state.players, 0, targetId)) {
+            const dist = distance(state.players, 0, targetId);
+            let maxReach: number;
+
+            if (cardKey === 'bang') {
+                // Bang reach depends on the weapon
+                const weapon = human.inPlay
+                    .map((k) => CARD_DEFS[k])
+                    .find((c) => c?.weapon);
+                maxReach = weapon?.range ?? 1;
+            } else if (cardKey === 'panic') {
+                // Panic reach is ALWAYS 1, ignore the gun!
+                maxReach = 1;
+            } else {
+                maxReach = 10;
+            }
+
+            if (dist > maxReach) {
                 const s = structuredClone(state);
                 s.log = [
-                    `${target.name} is out of range! (distance ${distance(state.players, 0, targetId)})`,
+                    `${target.name} is out of range! (Distance: ${dist}, Reach: ${maxReach})`,
                     ...s.log,
                 ];
                 dispatch({ type: 'SET_STATE', state: s });
@@ -179,7 +199,7 @@ export default function App() {
                 dispatch({ type: 'SET_STATE', state: afterAction });
             }
         },
-        [dispatch],
+        [dispatch, human.inPlay],
     );
 
     const handlePlayCard = useCallback(async () => {
@@ -502,11 +522,13 @@ export default function App() {
             !currentCardPicker.isHuman &&
             currentCardPickerTarget
         ) {
+            const cardKey = G.phase;
             const aiDelay = setTimeout(async () => {
                 const picked = aiPickCardFrom(
                     G,
                     currentCardPickerTarget,
                     currentCardPicker,
+                    cardKey,
                 );
 
                 if (picked !== null) {
@@ -739,13 +761,29 @@ export default function App() {
                 }
             }
 
+            if (player.hand.includes('schofield')) {
+                if (!player.inPlay.includes('schofield')) {
+                    const aiDelay = setTimeout(async () => {
+                        triggerPopup(player.id, 'schofield', 'play');
+
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: 'schofield',
+                            sourceId: player.id,
+                            targetId: null,
+                        });
+                    }, 1500);
+                    return () => clearTimeout(aiDelay);
+                }
+            }
+
             if (player.hand.includes('panic')) {
                 const canPlayPanic = (() => {
                     const targets = G.players.filter(
                         (q) =>
                             q.alive &&
                             q.id !== player.id &&
-                            inRange(G.players, player.id, q.id) &&
+                            inRange(G.players, player.id, q.id, 'panic') &&
                             (q.hand.length > 0 || q.inPlay.length > 0),
                     );
                     if (!targets.length) return false;
@@ -763,7 +801,7 @@ export default function App() {
                           ]
                         : pool[Math.floor(Math.random() * pool.length)];
 
-                    return aiPickCardFrom(G, target, player) !== null
+                    return aiPickCardFrom(G, target, player, 'panic') !== null
                         ? target
                         : false;
                 })();
@@ -809,7 +847,7 @@ export default function App() {
                     const mustangBlockers = pool.filter(
                         (q) =>
                             q.inPlay.includes('mustang') &&
-                            !inRange(G.players, player.id, q.id),
+                            !inRange(G.players, player.id, q.id, 'panic'),
                     );
                     const inPlayTargets = pool.filter(
                         (q) => q.inPlay.length > 0,
@@ -824,7 +862,8 @@ export default function App() {
                             ]
                           : pool[Math.floor(Math.random() * pool.length)];
 
-                    return aiPickCardFrom(G, target, player) !== null
+                    return aiPickCardFrom(G, target, player, 'catbalou') !==
+                        null
                         ? target
                         : false;
                 })();
@@ -926,7 +965,7 @@ export default function App() {
                             q.alive &&
                             q.id !== player.id &&
                             isEnemy(G, player.id, q.id) &&
-                            inRange(G.players, player.id, q.id),
+                            inRange(G.players, player.id, q.id, 'bang'),
                     );
                     if (!enemies.length) return false;
                     return enemies.reduce((a, b) => (b.hp < a.hp ? b : a));
@@ -989,8 +1028,7 @@ export default function App() {
         }
     }, [G, G.over, G.phase, G.players, G.turn, G.generalStoreCards]);
 
-    console.log(G.discardPile);
-    console.log(G.reactorId);
+    validateCardFrequencies(G);
 
     return (
         <div
