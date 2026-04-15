@@ -1,7 +1,9 @@
 import { CARD_DEFS } from '@/definitions/cards';
 import { cn } from '@/lib/utils';
 import { CardKey } from '@/types';
+import { Crosshair } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface PlayerHandProps {
     hand: CardKey[];
@@ -48,67 +50,85 @@ export default function PlayerHand({
                     if (!c) return null;
                     const isSel = selectedCard === i;
                     return (
-                        <motion.div
-                            key={`${cardKey}-${crypto.randomUUID()}`}
-                            layout
-                            whileHover={{ y: -20, zIndex: 50 }}
-                            className={cn(
-                                // Base Styles: Fixed height, flexible width with min/max constraints
-                                'relative flex shrink cursor-pointer flex-col items-center justify-between rounded-xl p-2 select-none',
-                                'aspect-2/3 w-full max-w-30 min-w-0',
-                                'border-2 shadow-2xl',
-
-                                // Color Themes
-                                c.color === 'brown' &&
-                                    'border-amber-800 bg-linear-to-br from-amber-100 to-amber-200 text-amber-950',
-                                c.color === 'blue' &&
-                                    'border-blue-800 bg-linear-to-br from-blue-100 to-blue-200 text-blue-950',
-
-                                // Selection / Discard States
-                                isSel &&
-                                    'z-40 -translate-y-6 border-yellow-500 ring-4 shadow-yellow-500/50 ring-yellow-400',
-                                discardingToEndTurn &&
-                                    'border-red-500 grayscale-[0.3] hover:grayscale-0',
-                                !isSel &&
-                                    !discardingToEndTurn &&
-                                    'hover:border-white',
-                            )}
-                            onClick={() => onCardClick(i)}
-                        >
-                            {/* Card Content */}
-                            <div className="flex w-full items-start justify-between text-[10px] font-black sm:text-xs">
-                                <span className="pr-1 leading-none wrap-break-word uppercase">
-                                    {c.name}
-                                </span>
-                                <span
+                        <Tooltip key={`${cardKey}-${crypto.randomUUID()}`}>
+                            <TooltipTrigger asChild>
+                                <motion.div
+                                    layout
+                                    whileHover={{ y: -20, zIndex: 50 }}
                                     className={cn(
-                                        c.color === 'brown'
-                                            ? 'text-red-600'
-                                            : 'text-stone-800',
+                                        // Base Styles: Fixed height, flexible width with min/max constraints
+                                        'relative flex shrink cursor-pointer flex-col items-center justify-between rounded-xl p-2 select-none',
+                                        'aspect-2/3 w-full max-w-30 min-w-0',
+                                        'border-2 shadow-2xl',
+
+                                        // Color Themes
+                                        c.color === 'brown' &&
+                                            'border-amber-800 bg-linear-to-br from-amber-100 to-amber-200 text-amber-950',
+                                        c.color === 'blue' &&
+                                            'border-blue-800 bg-linear-to-br from-blue-100 to-blue-200 text-blue-950',
+
+                                        // Selection / Discard States
+                                        isSel &&
+                                            'z-40 -translate-y-6 border-yellow-500 ring-4 shadow-yellow-500/50 ring-yellow-400',
+                                        discardingToEndTurn &&
+                                            'border-red-500 grayscale-[0.3] hover:grayscale-0',
+                                        !isSel &&
+                                            !discardingToEndTurn &&
+                                            'hover:border-white',
                                     )}
+                                    onClick={() => onCardClick(i)}
                                 >
-                                    ♥
-                                </span>
-                            </div>
+                                    {/* Card Content */}
+                                    <div className="flex w-full items-start justify-between text-[10px] font-black sm:text-xs">
+                                        <span className="pr-1 leading-none wrap-break-word uppercase">
+                                            {c.name}
+                                        </span>
+                                        <span
+                                            className={cn(
+                                                c.color === 'brown'
+                                                    ? 'text-red-600'
+                                                    : 'text-stone-800',
+                                            )}
+                                        >
+                                            ♥
+                                        </span>
+                                    </div>
 
-                            <div className="my-auto text-3xl drop-shadow-sm filter sm:text-4xl">
-                                {c.icon}
-                            </div>
+                                    <div className="my-auto flex flex-col gap-2 text-3xl drop-shadow-sm filter sm:text-4xl">
+                                        {/* Main Card Icon (e.g., the Gun or the Hand) */}
+                                        {c.icon}
 
-                            {/* Decorative Bottom Detail */}
-                            <div className="flex w-full justify-center opacity-20">
-                                <div className="h-px w-full bg-current" />
-                            </div>
+                                        {/* Range Indicator - only shows if c.range exists */}
+                                        {c.range && (
+                                            <div className="flex items-center justify-center gap-1 text-xl opacity-90 sm:text-2xl">
+                                                <Crosshair
+                                                    size={24}
+                                                    className="inline-block"
+                                                />
+                                                <span className="font-bold">
+                                                    {c.range}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
 
-                            {/* Discard Overlay Hint */}
-                            {discardingToEndTurn && (
-                                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-red-900/10 opacity-0 transition-opacity hover:opacity-100">
-                                    <span className="rounded bg-red-600 px-2 py-1 text-[10px] font-bold text-white">
-                                        DISCARD
-                                    </span>
-                                </div>
-                            )}
-                        </motion.div>
+                                    {/* Decorative Bottom Detail */}
+                                    <div className="flex w-full justify-center opacity-20">
+                                        <div className="h-px w-full bg-current"></div>
+                                    </div>
+
+                                    {/* Discard Overlay Hint */}
+                                    {discardingToEndTurn && (
+                                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-red-900/10 opacity-0 transition-opacity hover:opacity-100">
+                                            <span className="rounded bg-red-600 px-2 py-1 text-[10px] font-bold text-white">
+                                                DISCARD
+                                            </span>
+                                        </div>
+                                    )}
+                                </motion.div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{c.desc}</TooltipContent>
+                        </Tooltip>
                     );
                 })}
             </div>
