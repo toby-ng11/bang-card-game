@@ -1,6 +1,12 @@
 import { CardDef, CardKey } from '@/types';
 
 const CARD_DEFS: Record<CardKey, CardDef> = {
+    ability: {
+        name: '',
+        icon: '✨',
+        desc: '',
+        color: 'brown',
+    },
     bang: {
         name: 'BANG!',
         icon: '🔫',

@@ -2,12 +2,12 @@ import { CARD_DEFS } from '@/definitions/cards';
 import { inRange, isEnemy } from '@/game/helpers';
 import { CardKey, CardPick, GameState, Player } from '@/types';
 
-function aiPickCardFrom(
+const aiPickCardFrom = (
     state: GameState,
     target: Player,
     perspective: Player,
     actionCardKey: CardKey,
-) {
+): CardPick | null => {
     // perspective = the AI player doing the action
     const allCards: CardPick[] = [
         ...target.hand.map((c, i) => ({
@@ -67,7 +67,7 @@ function aiPickCardFrom(
             ? inPlayCards[Math.floor(Math.random() * inPlayCards.length)]
             : handCards[0];
     }
-}
+};
 
 const getAIDiscardCard = (G: GameState, playerId: number): CardKey => {
     const player = G.players[playerId];

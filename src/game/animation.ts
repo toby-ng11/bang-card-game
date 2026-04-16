@@ -1,14 +1,31 @@
 import { CARD_DEFS } from '@/definitions/cards';
+import { GameAction } from '@/gameReducer';
 import { CardKey } from '@/types';
+import { Dispatch } from 'react';
 import { toast } from 'sonner';
 
-function showBanner(text: string, duration = 1100): Promise<void> {
+const showBanner = (text: string, duration = 1100): Promise<void> => {
     toast(text, {
         duration,
         position: 'top-center',
     });
     return wait(duration);
-}
+};
+
+const triggerPopup = (
+    pid: number,
+    cardKey: CardKey,
+    type: 'play' | 'damage' | 'heal' = 'play',
+    dispatch: Dispatch<GameAction>,
+) => {
+    const id = Math.random().toString();
+    dispatch({ type: 'ADD_POPUP', payload: { id, pid, cardKey, type } });
+
+    // Auto-remove after animation finishes
+    setTimeout(() => {
+        dispatch({ type: 'REMOVE_POPUP', id });
+    }, 1500);
+};
 
 function popupOnPlayer(
     pid: number,
@@ -36,58 +53,8 @@ function popupOnPlayer(
     );
 }
 
-function getPlayerEl(id: number): HTMLDivElement {
-    return document.querySelector(`[data-pid="${id}"]`) as HTMLDivElement;
-}
-
-function floatCard(
-    cardKey: CardKey,
-    fromEl: HTMLDivElement,
-    toEl: HTMLDivElement,
-): Promise<void> {
-    const fc = document.getElementById('float-card');
-    const fiEl = fc?.querySelector('.fi');
-    const fnEl = document.getElementById('fc-name');
-    if (!fc || !fromEl || !toEl) return Promise.resolve();
-
-    const c = CARD_DEFS[cardKey];
-    if (fiEl) fiEl.textContent = c ? c.icon : '?';
-    if (fnEl) fnEl.textContent = c ? c.name : '';
-
-    const fr = fromEl.getBoundingClientRect();
-    const tr = toEl.getBoundingClientRect();
-    const sx = fr.left + fr.width / 2 - 26;
-    const sy = fr.top + fr.height / 2 - 36;
-    const ex = tr.left + tr.width / 2 - 26;
-    const ey = tr.top + tr.height / 2 - 36;
-
-    fc.style.transition = 'none';
-    fc.style.left = `${sx}px`;
-    fc.style.top = `${sy}px`;
-    fc.style.opacity = '1';
-    fc.style.transform = 'scale(1)';
-
-    return new Promise((res) => {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                fc.style.transition = [
-                    'left 0.5s cubic-bezier(0.4,0,0.2,1)',
-                    'top 0.5s cubic-bezier(0.4,0,0.2,1)',
-                    'opacity 0.3s 0.3s',
-                    'transform 0.5s',
-                ].join(',');
-                fc.style.left = `${ex}px`;
-                fc.style.top = `${ey}px`;
-                fc.style.opacity = '0';
-                fc.style.transform = 'scale(0.7)';
-                setTimeout(res, 650);
-            });
-        });
-    });
-}
-
-function wait(ms: number): Promise<void> {
+const wait = (ms: number): Promise<void> => {
     return new Promise((r) => setTimeout(r, ms));
-}
+};
 
-export { floatCard, getPlayerEl, popupOnPlayer, showBanner, wait };
+export { popupOnPlayer, showBanner, triggerPopup, wait };

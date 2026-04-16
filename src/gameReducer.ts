@@ -1,4 +1,5 @@
 import { CARD_DEFS } from './definitions/cards';
+import { CHARACTER_DEFS, CharacterKey } from './definitions/character';
 import { dealN } from './game/helpers';
 import {
     CardKey,
@@ -73,6 +74,12 @@ type GameAction =
     | {
           type: 'PLAY_CARD';
           cardKey: CardKey;
+          sourceId: number;
+          targetId: number | null;
+      }
+    | {
+          type: 'RESOLVE_CHARACTER_ABILITY';
+          characterKey: CharacterKey;
           sourceId: number;
           targetId: number | null;
       }
@@ -198,30 +205,34 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             const newState = structuredClone(state);
             const player = newState.players[0];
             const discarded = player.hand.splice(action.idx, 1);
-            newState.discardPile.push(...discarded);
-            newState.log = [
-                `You discard ${CARD_DEFS[discarded[0]]?.name || discarded[0]}.`,
-                ...newState.log,
-            ];
+            const canEndTurn = player.hand.length <= player.hp;
 
-            if (player.hand.length <= player.hp) {
-                newState.discardingToEndTurn = false;
-                let next = (newState.turn + 1) % newState.players.length;
-                let att = 0;
-                while (
-                    !newState.players[next].alive &&
-                    att < newState.players.length
-                ) {
-                    next = (next + 1) % newState.players.length;
-                    att++;
-                }
-                newState.turn = next;
-                newState.phase = 'draw';
-                newState.bangUsed = false;
-                newState.selectedCard = null;
-                newState.targeting = false;
+            let next = (newState.turn + 1) % newState.players.length;
+            let att = 0;
+            while (
+                !newState.players[next].alive &&
+                att < newState.players.length
+            ) {
+                next = (next + 1) % newState.players.length;
+                att++;
             }
-            return newState;
+
+            return {
+                ...newState,
+                discardPile: [discarded[0], ...newState.discardPile],
+                log: [
+                    `You discard ${CARD_DEFS[discarded[0]]?.name || discarded[0]}.`,
+                    ...newState.log,
+                ],
+                discardingToEndTurn: canEndTurn
+                    ? false
+                    : newState.discardingToEndTurn,
+                turn: canEndTurn ? next : newState.turn,
+                phase: canEndTurn ? 'draw' : newState.phase,
+                bangUsed: canEndTurn ? false : newState.bangUsed,
+                selectedCard: null,
+                targeting: canEndTurn ? false : newState.targeting,
+            };
         }
 
         case 'DISCARD_A_CARD_FROM_HAND': {
@@ -705,30 +716,31 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         }
 
                         case 'generalstore': {
-                            const alivePlayersCount = state.players.filter(
+                            const newState = structuredClone(state);
+                            const alivePlayersCount = newState.players.filter(
                                 (p) => p.hp > 0,
                             ).length;
-                            const drawnCards = state.deck.slice(
+                            const drawnCards = newState.deck.slice(
                                 0,
                                 alivePlayersCount,
                             );
                             const remainingDeck =
-                                state.deck.slice(alivePlayersCount);
+                                newState.deck.slice(alivePlayersCount);
 
-                            const startIndex = state.players.findIndex(
+                            const startIndex = newState.players.findIndex(
                                 (p) => p.id === sourceId,
                             );
                             const pickOrderIds = [];
-                            for (let i = 0; i < state.players.length; i++) {
+                            for (let i = 0; i < newState.players.length; i++) {
                                 const player =
-                                    state.players[
-                                        (startIndex + i) % state.players.length
+                                    newState.players[
+                                        (startIndex + i) % newState.players.length
                                     ];
                                 if (player.hp > 0) pickOrderIds.push(player.id);
                             }
 
                             return {
-                                ...state,
+                                ...newState,
                                 deck: remainingDeck,
                                 discardPile: newDiscardPile,
                                 players: newPlayerState,
@@ -745,7 +757,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                                 },
                                 log: [
                                     `${sourcePlayer.name} played a General Store! ${alivePlayersCount} cards revealed.`,
-                                    ...state.log,
+                                    ...newState.log,
                                 ],
                             };
                         }
@@ -1046,6 +1058,49 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     }
                 }
 
+                default:
+                    return state;
+            }
+        }
+
+        case 'RESOLVE_CHARACTER_ABILITY': {
+            const { characterKey, sourceId, targetId } = action;
+            const character = CHARACTER_DEFS[characterKey];
+            const sourcePlayer = state.players[sourceId];
+
+            switch (characterKey) {
+                case 'bart_cassidy': {
+                    const count = 1;
+                    const { updatedPlayers, updatedState } = handleDrawEffect(
+                        { ...state },
+                        sourceId,
+                        count,
+                    );
+
+                    return {
+                        ...updatedState,
+                        players: updatedPlayers,
+                        log: [
+                            `${sourcePlayer.name} use ${character.name}'s ability! Draw 1 card from the deck.`,
+                            ...state.log,
+                        ],
+                    };
+                }
+                case 'black_jack':
+                case 'calamity_janet':
+                case 'el_gringo':
+                case 'jesse_jones':
+                case 'jourdonnas':
+                case 'kit_carlson':
+                case 'lucky_duke':
+                case 'paul_regret':
+                case 'pedro_ramirez':
+                case 'rose_doolan':
+                case 'sid_ketchum':
+                case 'slab_the_killer':
+                case 'suzy_lafayette':
+                case 'vulture_sam':
+                case 'willy_the_kid':
                 default:
                     return state;
             }

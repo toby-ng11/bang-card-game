@@ -27,7 +27,9 @@ function distance(players: Player[], from: number, to: number): number {
     return Math.max(
         1,
         base +
+            (players[to].character === 'paul_regret' ? 1 : 0) +
             (players[to].inPlay.includes('mustang') ? 1 : 0) -
+            (players[from].character === 'rose_doolan' ? 1 : 0) -
             (players[from].inPlay.includes('scope') ? 1 : 0),
     );
 }
@@ -50,28 +52,13 @@ function inRange(
 
     return distance(players, from, to) <= reach;
 }
-
-function refillDeck(state: GameState): GameState {
-    if (state.deck.length === 0 && state.discardPile.length > 0) {
-        return {
-            ...state,
-            deck: shuffle([...state.discardPile]),
-            discardPile: [],
-            log: ['(Deck reshuffled from discard pile.)', ...state.log].slice(
-                0,
-                25,
-            ),
-        };
-    }
-    return state;
-}
-
 function dealN(
     state: GameState,
     n: number,
 ): { cards: CardKey[]; state: GameState } {
-    let currentDeck = [...state.deck];
-    let currentDiscard = [...state.discardPile];
+    const newState = structuredClone(state);
+    let currentDeck = [...newState.deck];
+    let currentDiscard = [...newState.discardPile];
 
     if (currentDeck.length < n) {
         const shuffledDiscard = shuffle(currentDiscard);
@@ -85,7 +72,7 @@ function dealN(
     return {
         cards: drawnCards,
         state: {
-            ...state,
+            ...newState,
             deck: remainingDeck,
             discardPile: currentDiscard,
         },
@@ -227,7 +214,6 @@ export {
     distance,
     inRange,
     isEnemy,
-    refillDeck,
     shuffle,
     validateCardChecksum,
     validateCardFrequencies,

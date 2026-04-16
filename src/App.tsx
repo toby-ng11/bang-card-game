@@ -8,7 +8,7 @@ import PlayerHand from '@/components/PlayerHand';
 import RoleBanner from '@/components/RoleBanner';
 import { Toaster } from '@/components/ui/sonner';
 import { CARD_DEFS } from '@/definitions/cards';
-import { showBanner, wait } from '@/game/animation';
+import { showBanner, triggerPopup, wait } from '@/game/animation';
 import { checkWin } from '@/game/combat';
 import {
     distance,
@@ -24,7 +24,9 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { FloatAnimation } from './components/FloatLayer';
 import { BattleLogPanel } from './components/GameLogPanel';
 import PopupLayer from './components/PopupLayer';
+import { handlePostDamageAbilities } from './game/ability-helpers';
 import { aiPickCardFrom, getAIDiscardCard } from './game/ai';
+import { usePhaseResolver } from './game/engine';
 
 export default function App() {
     const [G, dispatch] = useReducer(gameReducer, null, initGame);
@@ -48,20 +50,6 @@ export default function App() {
         await wait(500);
 
         dispatch({ type: 'DRAW_CARDS_TO_START_TURN', playerId: 0 });
-    };
-
-    const triggerPopup = (
-        pid: number,
-        cardKey: CardKey,
-        type: 'play' | 'damage' | 'heal' = 'play',
-    ) => {
-        const id = Math.random().toString();
-        dispatch({ type: 'ADD_POPUP', payload: { id, pid, cardKey, type } });
-
-        // Auto-remove after animation finishes
-        setTimeout(() => {
-            dispatch({ type: 'REMOVE_POPUP', id });
-        }, 1500);
     };
 
     const handleCardClick = useCallback(
@@ -209,7 +197,7 @@ export default function App() {
         if (selectedCardKey === null) return;
         const cardKey = player.hand[selectedCardKey];
 
-        triggerPopup(player.id, cardKey, 'play');
+        triggerPopup(player.id, cardKey, 'play', dispatch);
         await showBanner(
             `${player.name} play a ${CARD_DEFS[cardKey].name}!`,
             900,
@@ -258,329 +246,7 @@ export default function App() {
     }, [dispatch]);
 
     // Auto effects
-    useEffect(() => {
-        const reactor = G.players.find((p) => p.id === G.reactorId[0]);
-
-        if (G.phase === 'dying' && reactor && !reactor.isHuman) {
-            const aiDelay = setTimeout(() => {
-                const hasBeer = reactor.hand.includes('beer');
-
-                if (hasBeer) {
-                    // AI chugs a beer
-                    triggerPopup(reactor.id, 'beer', 'heal');
-                    dispatch({
-                        type: 'DRINK_BEER_TO_SURVIVE',
-                        playerId: reactor.id,
-                        prevPhase: G.pendingAction?.type
-                            ? G.pendingAction?.type
-                            : 'play',
-                    });
-                } else {
-                    // No more beers and HP <= 0? Dead.
-                    dispatch({
-                        type: 'TAKE_DAMAGE',
-                        sourceId: G.pendingAction?.sourceId ?? null,
-                        targetId: reactor.id,
-                        damageAmount: 999,
-                    });
-                }
-
-                dispatch({ type: 'FINISH_ACTION' });
-            }, 1000); // 1 second between beers for dramatic effect
-
-            return () => clearTimeout(aiDelay);
-        }
-
-        if (G.phase === 'bang' && reactor) {
-            const aiDelay = setTimeout(async () => {
-                const hasBarrel = reactor.inPlay.includes('barrel');
-                const chance = 0.25;
-                if (hasBarrel && Math.random() < chance) {
-                    triggerPopup(reactor.id, 'barrel', 'heal');
-                    dispatch({
-                        type: 'RESOLVE_BARREL',
-                        playerId: reactor.id,
-                    });
-                } else {
-                    const hasMissed = reactor.hand.includes('missed');
-                    if (hasMissed) {
-                        triggerPopup(reactor.id, 'missed', 'play');
-                        dispatch({
-                            type: 'PLAY_CARD',
-                            cardKey: 'missed',
-                            sourceId: reactor.id,
-                            targetId: G.pendingAction?.targetId ?? null,
-                        });
-                    } else {
-                        triggerPopup(reactor.id, 'bang', 'damage');
-                        dispatch({
-                            type: 'TAKE_DAMAGE',
-                            sourceId: G.pendingAction?.sourceId ?? null,
-                            targetId: reactor.id,
-                            damageAmount: 1,
-                        });
-                    }
-                }
-                dispatch({ type: 'FINISH_ACTION' });
-            }, 1000);
-
-            return () => clearTimeout(aiDelay);
-        }
-
-        if (G.phase === 'gatling' && reactor) {
-            const aiDelay = setTimeout(async () => {
-                const sourceId = G.pendingAction?.sourceId;
-                if (sourceId !== undefined) {
-                    dispatch({
-                        type: 'TRIGGER_FLOAT',
-                        cardKey: 'gatling',
-                        fromId: sourceId,
-                        toId: reactor.id,
-                    });
-                }
-
-                await wait(1000);
-
-                const hasBarrel = reactor.inPlay.includes('barrel');
-                const chance = 0.25;
-                if (hasBarrel && Math.random() < chance) {
-                    triggerPopup(reactor.id, 'barrel', 'heal');
-                    dispatch({
-                        type: 'RESOLVE_BARREL',
-                        playerId: reactor.id,
-                    });
-                } else {
-                    const hasMissed = reactor.hand.includes('missed');
-
-                    if (hasMissed) {
-                        // Trigger your beautiful popup!
-                        triggerPopup(reactor.id, 'missed', 'play');
-
-                        dispatch({
-                            type: 'PLAY_CARD',
-                            cardKey: 'missed',
-                            sourceId: reactor.id,
-                            targetId: G.pendingAction?.targetId ?? null,
-                        });
-                    } else {
-                        // Take damage popup
-                        triggerPopup(reactor.id, 'gatling', 'damage');
-
-                        dispatch({
-                            type: 'TAKE_DAMAGE',
-                            sourceId: G.pendingAction?.sourceId ?? null,
-                            targetId: reactor.id,
-                            damageAmount: 1,
-                        });
-                    }
-                }
-                dispatch({ type: 'FINISH_ACTION' });
-            }, 1000);
-            return () => clearTimeout(aiDelay);
-        }
-
-        if (G.phase === 'indians' && reactor) {
-            const aiDelay = setTimeout(async () => {
-                const hasBang = reactor.hand.includes('bang');
-                const sourceId = G.pendingAction?.sourceId;
-
-                if (sourceId !== undefined) {
-                    dispatch({
-                        type: 'TRIGGER_FLOAT',
-                        cardKey: 'indians',
-                        fromId: sourceId,
-                        toId: reactor.id,
-                    });
-                }
-
-                await wait(1000);
-
-                if (hasBang) {
-                    // Trigger your beautiful popup!
-                    triggerPopup(reactor.id, 'bang', 'play');
-
-                    dispatch({
-                        type: 'RESOLVE_INDIANS',
-                        playerId: reactor.id,
-                    });
-                } else {
-                    // Take damage popup
-                    triggerPopup(reactor.id, 'indians', 'damage');
-
-                    dispatch({
-                        type: 'TAKE_DAMAGE',
-                        sourceId: G.pendingAction?.sourceId ?? null,
-                        targetId: reactor.id,
-                        damageAmount: 1,
-                    });
-                }
-
-                dispatch({ type: 'FINISH_ACTION' });
-            }, 1000);
-            return () => clearTimeout(aiDelay);
-        }
-
-        if (G.phase === 'duel' && reactor && !reactor.isHuman) {
-            const aiDelay = setTimeout(() => {
-                const hasBang = reactor.hand.includes('bang');
-
-                if (hasBang) {
-                    // Trigger your beautiful popup!
-                    triggerPopup(reactor.id, 'bang', 'play');
-
-                    dispatch({
-                        type: 'RESOLVE_DUEL',
-                        playerId: reactor.id,
-                    });
-                } else {
-                    // Take damage popup
-                    triggerPopup(reactor.id, 'duel', 'damage');
-
-                    dispatch({
-                        type: 'TAKE_DAMAGE',
-                        sourceId: G.pendingAction?.sourceId ?? null,
-                        targetId: reactor.id,
-                        damageAmount: 1,
-                    });
-                }
-
-                dispatch({ type: 'FINISH_ACTION' });
-            }, 1000);
-            return () => clearTimeout(aiDelay);
-        }
-
-        if (G.phase === 'saloon' && reactor) {
-            const aiDelay = setTimeout(() => {
-                // Trigger your beautiful popup!
-                triggerPopup(reactor.id, 'beer', 'heal');
-
-                const healAmount = 1;
-
-                dispatch({
-                    type: 'HEAL_A_PLAYER',
-                    playerId: reactor.id,
-                    amount: healAmount,
-                });
-
-                dispatch({
-                    type: 'RESOLVE_SALOON',
-                    playerId: reactor.id,
-                });
-
-                dispatch({ type: 'FINISH_ACTION' });
-            }, 1000);
-            return () => clearTimeout(aiDelay);
-        }
-
-        const currentGeneralStorePickerId =
-            G.generalStoreOrder?.[G.generalStoreIndex];
-        const currentGeneralStorePicker = G.players.find(
-            (p) => p.id === currentGeneralStorePickerId,
-        );
-        if (
-            G.phase === 'generalstore' &&
-            currentGeneralStorePicker &&
-            !currentGeneralStorePicker.isHuman
-        ) {
-            const availableCards = G.generalStoreCards;
-            if (availableCards && availableCards.length > 0) {
-                const aiDelay = setTimeout(async () => {
-                    // AI Logic: Priority is 'bang', otherwise take the first available card
-                    const pick = availableCards.includes('bang')
-                        ? 'bang'
-                        : availableCards[0];
-
-                    dispatch({
-                        type: 'RESOLVE_GENERAL_STORE_PICK',
-                        cardKey: pick,
-                        playerId: currentGeneralStorePicker.id,
-                    });
-
-                    // Show a quick banner so the human knows what the AI took
-                    await showBanner(
-                        `${currentGeneralStorePicker.name} picks ${CARD_DEFS[pick]?.name || pick}.`,
-                        700,
-                    );
-                }, 1200); // Slightly longer delay than reaction to feel more "natural"
-
-                return () => clearTimeout(aiDelay);
-            }
-        }
-
-        const currentCardPickerId = G.pendingAction?.sourceId;
-        const currentCardPicker = G.players.find(
-            (p) => p.id === currentCardPickerId,
-        );
-        const currentCardPickerTargetId = G.cardPickerTarget;
-        const currentCardPickerTarget = G.players.find(
-            (p) => p.id === currentCardPickerTargetId,
-        );
-
-        if (
-            (G.phase === 'panic' || G.phase === 'catbalou') &&
-            currentCardPicker &&
-            !currentCardPicker.isHuman &&
-            currentCardPickerTarget
-        ) {
-            const cardKey = G.phase;
-            const aiDelay = setTimeout(async () => {
-                const picked = aiPickCardFrom(
-                    G,
-                    currentCardPickerTarget,
-                    currentCardPicker,
-                    cardKey,
-                );
-
-                if (picked !== null) {
-                    dispatch({
-                        type: 'RESOLVE_CARD_PICK',
-                        payload: picked,
-                    });
-
-                    if (G.phase === 'panic') {
-                        dispatch({
-                            type: 'TRIGGER_FLOAT',
-                            cardKey: picked.key,
-                            fromId: currentCardPickerTarget.id,
-                            toId: currentCardPicker.id,
-                        });
-
-                        // Show a quick banner so the human knows what the AI took
-                        await showBanner(
-                            `${currentCardPicker.name} picks ${CARD_DEFS[picked.key]?.name || picked.key}.`,
-                            700,
-                        );
-                    } else {
-                        dispatch({
-                            type: 'TRIGGER_FLOAT',
-                            cardKey: picked.key,
-                            fromId: currentCardPickerTarget.id,
-                            toId: 'discard',
-                        });
-
-                        // Show a quick banner so the human knows what the AI took
-                        await showBanner(
-                            `${currentCardPicker.name} discard a ${CARD_DEFS[picked.key]?.name || picked.key} from ${currentCardPickerTarget.name}.`,
-                            700,
-                        );
-                    }
-                }
-            }, 1200); // Slightly longer delay than reaction to feel more "natural"
-
-            return () => clearTimeout(aiDelay);
-        }
-    }, [
-        G,
-        G.phase,
-        G.reactorId,
-        G.players,
-        G.pendingAction?.type,
-        G.pendingAction?.sourceId,
-        G.pendingAction?.targetId,
-        G.generalStoreCards,
-        G.generalStoreIndex,
-        G.generalStoreOrder,
-    ]);
+    usePhaseResolver(G, dispatch);
 
     // AI plays
     useEffect(() => {
@@ -616,7 +282,7 @@ export default function App() {
             if (player.hand.includes('beer')) {
                 if (player.hp <= 2 && alivePlayers.length > 2) {
                     const aiDelay = setTimeout(() => {
-                        triggerPopup(player.id, 'beer', 'heal');
+                        triggerPopup(player.id, 'beer', 'heal', dispatch);
                         dispatch({
                             type: 'PLAY_CARD',
                             cardKey: 'beer',
@@ -632,7 +298,7 @@ export default function App() {
                 if (player.hp < player.maxHp) {
                     const aiDelay = setTimeout(() => {
                         // Trigger your beautiful popup!
-                        triggerPopup(player.id, 'saloon', 'play');
+                        triggerPopup(player.id, 'saloon', 'play', dispatch);
 
                         dispatch({
                             type: 'PLAY_CARD',
@@ -647,7 +313,7 @@ export default function App() {
 
             if (player.hand.includes('generalstore')) {
                 const aiDelay = setTimeout(async () => {
-                    triggerPopup(player.id, 'generalstore', 'play');
+                    triggerPopup(player.id, 'generalstore', 'play', dispatch);
 
                     await wait(1000);
 
@@ -663,7 +329,7 @@ export default function App() {
 
             if (player.hand.includes('stagecoach')) {
                 const aiDelay = setTimeout(async () => {
-                    triggerPopup(player.id, 'stagecoach', 'play');
+                    triggerPopup(player.id, 'stagecoach', 'play', dispatch);
 
                     await wait(1000);
 
@@ -689,7 +355,7 @@ export default function App() {
 
             if (player.hand.includes('wellsfargo')) {
                 const aiDelay = setTimeout(async () => {
-                    triggerPopup(player.id, 'wellsfargo', 'play');
+                    triggerPopup(player.id, 'wellsfargo', 'play', dispatch);
 
                     await wait(1000);
 
@@ -716,7 +382,7 @@ export default function App() {
             if (player.hand.includes('mustang')) {
                 if (!player.inPlay.includes('mustang')) {
                     const aiDelay = setTimeout(async () => {
-                        triggerPopup(player.id, 'mustang', 'play');
+                        triggerPopup(player.id, 'mustang', 'play', dispatch);
 
                         dispatch({
                             type: 'PLAY_CARD',
@@ -732,7 +398,7 @@ export default function App() {
             if (player.hand.includes('scope')) {
                 if (!player.inPlay.includes('scope')) {
                     const aiDelay = setTimeout(async () => {
-                        triggerPopup(player.id, 'scope', 'play');
+                        triggerPopup(player.id, 'scope', 'play', dispatch);
 
                         dispatch({
                             type: 'PLAY_CARD',
@@ -748,7 +414,7 @@ export default function App() {
             if (player.hand.includes('barrel')) {
                 if (!player.inPlay.includes('barrel')) {
                     const aiDelay = setTimeout(async () => {
-                        triggerPopup(player.id, 'barrel', 'play');
+                        triggerPopup(player.id, 'barrel', 'play', dispatch);
 
                         dispatch({
                             type: 'PLAY_CARD',
@@ -879,7 +545,7 @@ export default function App() {
             if (player.hand.includes('gatling')) {
                 const aiDelay = setTimeout(() => {
                     // Trigger your beautiful popup!
-                    triggerPopup(player.id, 'gatling', 'play');
+                    triggerPopup(player.id, 'gatling', 'play', dispatch);
 
                     dispatch({
                         type: 'PLAY_CARD',
@@ -894,7 +560,7 @@ export default function App() {
             if (player.hand.includes('indians')) {
                 const aiDelay = setTimeout(() => {
                     // Trigger your beautiful popup!
-                    triggerPopup(player.id, 'indians', 'play');
+                    triggerPopup(player.id, 'indians', 'play', dispatch);
 
                     dispatch({
                         type: 'PLAY_CARD',
@@ -958,7 +624,7 @@ export default function App() {
                     (handGunRange > playGunRange || gunInHand === 'volcanic')
                 ) {
                     const aiDelay = setTimeout(async () => {
-                        triggerPopup(player.id, gunInHand, 'play');
+                        triggerPopup(player.id, gunInHand, 'play', dispatch);
 
                         dispatch({
                             type: 'PLAY_CARD',
@@ -1141,20 +807,36 @@ export default function App() {
                                 })
                             }
                             onDuelingDiscardBang={() => {
-                                triggerPopup(human.id, 'bang', 'play');
+                                triggerPopup(
+                                    human.id,
+                                    'bang',
+                                    'play',
+                                    dispatch,
+                                );
                                 dispatch({
                                     type: 'RESOLVE_DUEL',
                                     playerId: human.id,
                                 });
                             }}
-                            onDuelingTakeDamage={() => {
-                                triggerPopup(human.id, 'duel', 'damage');
+                            onDuelingTakeDamage={async () => {
+                                triggerPopup(
+                                    human.id,
+                                    'duel',
+                                    'damage',
+                                    dispatch,
+                                );
                                 dispatch({
                                     type: 'TAKE_DAMAGE',
                                     sourceId: G.pendingAction?.sourceId ?? null,
                                     targetId: human.id,
                                     damageAmount: 1,
                                 });
+
+                                await handlePostDamageAbilities(
+                                    human,
+                                    G.pendingAction?.sourceId ?? null,
+                                    dispatch,
+                                );
 
                                 dispatch({ type: 'FINISH_ACTION' });
                             }}

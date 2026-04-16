@@ -2,6 +2,7 @@ import { CharacterKey } from '@/definitions/character';
 
 // ── Cards ────────────────────────────────────────────────────────
 export type CardKey =
+    | 'ability'
     | 'bang'
     | 'missed'
     | 'beer'
