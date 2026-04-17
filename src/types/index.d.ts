@@ -44,7 +44,8 @@ export type Phase =
     | 'dying'
     | 'game-over'
     | 'check-win'
-    | CardKey;
+    | CardKey
+    | CharacterKey;
 
 export type Winner = 'SHERIFF' | 'OUTLAW' | 'RENEGADE' | null;
 
@@ -61,12 +62,6 @@ export interface Player {
     isHuman: boolean;
 }
 
-export interface PlayerAction {
-    type: CardKey;
-    sourceId: number;
-    targetId: number | null; //null if self-target
-}
-
 // ── Card picker ──────────────────────────────────────────────────
 export type CardPickSource = 'hand' | 'inPlay';
 
@@ -74,6 +69,13 @@ export interface CardPick {
     source: CardPickSource;
     idx: number;
     key: CardKey;
+}
+
+export interface PlayerAction {
+    type: CardKey | CharacterKey | 'dying';
+    sourceId: number;
+    targetId: number[]; // original targets, null if self-target
+    reactorId: number[]; // players to react, null if self-target
 }
 
 // ── Game state ───────────────────────────────────────────────────
@@ -89,8 +91,7 @@ export interface GameState {
     winner: Winner;
     selectedCard: number | null;
     targeting: boolean;
-    pendingAction: PlayerAction | null;
-    reactorId: number[];
+    pendingAction: PlayerAction[];
     discardingToEndTurn: boolean;
 
     // card picker (Panic!, Cat Balou)

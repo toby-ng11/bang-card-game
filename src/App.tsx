@@ -9,7 +9,6 @@ import RoleBanner from '@/components/RoleBanner';
 import { Toaster } from '@/components/ui/sonner';
 import { CARD_DEFS } from '@/definitions/cards';
 import { showBanner, triggerPopup, wait } from '@/game/animation';
-import { checkWin } from '@/game/combat';
 import {
     distance,
     inRange,
@@ -26,6 +25,7 @@ import { BattleLogPanel } from './components/GameLogPanel';
 import PopupLayer from './components/PopupLayer';
 import { handlePostDamageAbilities } from './game/ability-helpers';
 import { aiPickCardFrom, getAIDiscardCard } from './game/ai';
+import { getGunScore } from './game/combat';
 import { usePhaseResolver } from './game/engine';
 
 export default function App() {
@@ -35,6 +35,7 @@ export default function App() {
 
     const GRef = useRef(G);
     GRef.current = G;
+    const [currentAction] = G.pendingAction;
 
     const handleDraw = async () => {
         if (!G.players[G.turn].isHuman || G.phase !== 'draw') return;
@@ -55,7 +56,9 @@ export default function App() {
     const handleCardClick = useCallback(
         (i: number) => {
             const isMyTurn = G.players[G.turn].isHuman && G.phase === 'play';
-            const isMyTurnToReact = G.reactorId[0] === 0;
+            const [currentAction] = G.pendingAction;
+            const currentReactorId = currentAction?.targetId[0];
+            const isMyTurnToReact = currentReactorId === 0;
 
             if ((!isMyTurn && !isMyTurnToReact) || G.targeting) return;
 
@@ -180,12 +183,6 @@ export default function App() {
                 sourceId: p.id,
                 targetId: targetId,
             });
-
-            // check win after any targeted action
-            const afterAction = checkWin(GRef.current);
-            if (afterAction.over) {
-                dispatch({ type: 'SET_STATE', state: afterAction });
-            }
         },
         [dispatch, human.inPlay],
     );
@@ -280,7 +277,7 @@ export default function App() {
         const alivePlayers = G.players.filter((p) => p.alive);
         if (G.phase === 'play') {
             if (player.hand.includes('beer')) {
-                if (player.hp <= 2 && alivePlayers.length > 2) {
+                if (player.hp < player.maxHp && alivePlayers.length > 2) {
                     const aiDelay = setTimeout(() => {
                         triggerPopup(player.id, 'beer', 'heal', dispatch);
                         dispatch({
@@ -542,6 +539,38 @@ export default function App() {
                 // fall through to discard/end turn
             }
 
+            const GUNS = Object.entries(CARD_DEFS)
+                .filter(([, card]) => card.weapon)
+                .map(([key]) => key);
+            const gunInHand = player.hand.filter((card) => GUNS.includes(card));
+            const gunInPlay = player.inPlay.find((card) => GUNS.includes(card));
+
+            if (gunInHand.length > 0) {
+                const bestHandGun = gunInHand.sort((a, b) => {
+                    const scoreA = getGunScore(a, player.character);
+                    const scoreB = getGunScore(b, player.character);
+                    return scoreB - scoreA;
+                })[0];
+
+                const currentScore = gunInPlay
+                    ? getGunScore(gunInPlay, player.character)
+                    : 0;
+                const newScore = getGunScore(bestHandGun, player.character);
+                if (newScore > currentScore) {
+                    const aiDelay = setTimeout(async () => {
+                        triggerPopup(player.id, bestHandGun, 'play', dispatch);
+
+                        dispatch({
+                            type: 'PLAY_CARD',
+                            cardKey: bestHandGun,
+                            sourceId: player.id,
+                            targetId: null,
+                        });
+                    }, 1500);
+                    return () => clearTimeout(aiDelay);
+                }
+            }
+
             if (player.hand.includes('gatling')) {
                 const aiDelay = setTimeout(() => {
                     // Trigger your beautiful popup!
@@ -608,38 +637,11 @@ export default function App() {
                 }
             }
 
-            const GUNS = Object.entries(CARD_DEFS)
-                .filter(([, card]) => card.weapon)
-                .map(([key]) => key);
-            const gunInHand = player.hand.find((card) => GUNS.includes(card));
-            const gunInPlay = player.inPlay.find((card) => GUNS.includes(card));
-
-            if (gunInHand) {
-                const handGunRange = CARD_DEFS[gunInHand].range ?? 1;
-                const playGunRange = gunInPlay
-                    ? (CARD_DEFS[gunInPlay].range ?? 1)
-                    : 1;
-                if (
-                    (!gunInPlay || gunInPlay !== gunInHand) &&
-                    (handGunRange > playGunRange || gunInHand === 'volcanic')
-                ) {
-                    const aiDelay = setTimeout(async () => {
-                        triggerPopup(player.id, gunInHand, 'play', dispatch);
-
-                        dispatch({
-                            type: 'PLAY_CARD',
-                            cardKey: gunInHand,
-                            sourceId: player.id,
-                            targetId: null,
-                        });
-                    }, 1500);
-                    return () => clearTimeout(aiDelay);
-                }
-            }
-
             if (player.hand.includes('bang')) {
                 const canUseBang =
-                    !G.bangUsed || player.inPlay.includes('volcanic');
+                    !G.bangUsed ||
+                    player.inPlay.includes('volcanic') ||
+                    player.character === 'willy_the_kid';
 
                 const bangTarget = (() => {
                     const enemies = G.players.filter(
@@ -750,7 +752,7 @@ export default function App() {
 
                     <AnimatePresence>
                         {G.phase === 'generalstore' && (
-                            <div className="absolute inset-0 z-40 flex items-center justify-center rounded-[100px] backdrop-blur-md">
+                            <div className="absolute inset-0 z-40 flex items-center justify-center rounded-[100px]">
                                 <GeneralStorePicker
                                     key="general-store-active"
                                     cards={G.generalStoreCards}
@@ -764,13 +766,31 @@ export default function App() {
                         )}
 
                         {G.cardPickerPicking && G.cardPickerTarget !== null && (
-                            <div className="absolute inset-0 z-40 flex items-center justify-center rounded-[100px] backdrop-blur-md">
+                            <div className="absolute inset-0 z-40 flex items-center justify-center rounded-[100px]">
                                 <CardPicker
                                     target={G.players[G.cardPickerTarget]}
                                     label={G.cardPickerLabel}
-                                    onPick={(picked) =>
-                                        handleCardPickerPick(picked)
+                                    handOnly={
+                                        G.phase === 'el_gringo' ? true : false
                                     }
+                                    onPick={async (picked) => {
+                                        if (
+                                            currentAction.type === 'el_gringo'
+                                        ) {
+                                            dispatch({
+                                                type: 'TRIGGER_FLOAT',
+                                                cardKey: picked.key,
+                                                fromId: currentAction
+                                                    .targetId[0],
+                                                toId: human.id,
+                                            });
+
+                                            await wait(1000);
+                                            handleCardPickerPick(picked);
+                                        } else {
+                                            handleCardPickerPick(picked);
+                                        }
+                                    }}
                                 />
                             </div>
                         )}
@@ -827,14 +847,20 @@ export default function App() {
                                 );
                                 dispatch({
                                     type: 'TAKE_DAMAGE',
-                                    sourceId: G.pendingAction?.sourceId ?? null,
+                                    sourceId:
+                                        G.pendingAction.filter(
+                                            (a) => a.type === 'duel',
+                                        )[0].sourceId ?? null,
                                     targetId: human.id,
                                     damageAmount: 1,
                                 });
 
                                 await handlePostDamageAbilities(
+                                    G,
                                     human,
-                                    G.pendingAction?.sourceId ?? null,
+                                    G.pendingAction.filter(
+                                        (a) => a.type === 'duel',
+                                    )[0].sourceId ?? null,
                                     dispatch,
                                 );
 

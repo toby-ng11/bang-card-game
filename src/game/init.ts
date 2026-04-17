@@ -52,7 +52,7 @@ function initGame(): GameState {
     // for testing
     const players: Player[] = roles.map((role, i) => {
         const isHuman = i === 0;
-        const characterKey = charPool.pop()!;
+        const characterKey = i === 0 ? 'el_gringo' : charPool.pop()!;
         const charInfo = CHARACTER_DEFS[characterKey];
 
         const hpBonus = role === 'SHERIFF' ? 1 : 0;
@@ -64,7 +64,7 @@ function initGame(): GameState {
             id: i,
             name: names[i],
             role,
-            character: i === 0 ? 'bart_cassidy' : characterKey,
+            character: characterKey,
             hp: finalMaxHp,
             maxHp: finalMaxHp,
             hand: initialHand,
@@ -90,8 +90,7 @@ function initGame(): GameState {
         winner: null,
         selectedCard: null,
         targeting: false,
-        pendingAction: null,
-        reactorId: [],
+        pendingAction: [],
         discardingToEndTurn: false,
         generalStoreCards: [],
         generalStorePicking: false,

@@ -10,26 +10,42 @@ interface CardPickerProps {
     target: Player;
     label: string;
     onPick: (picked: CardPick) => void;
+    handOnly?: boolean;
 }
 
-export default function CardPicker({ target, label, onPick }: CardPickerProps) {
-    const allCards: CardPick[] = [
-        ...shuffle(
-            target.hand.map((key, idx) => ({
-                source: 'hand' as CardPickSource,
-                idx,
-                key,
-            })),
-        ),
-        ...target.inPlay.map((key, idx) => ({
-            source: 'inPlay' as CardPickSource,
-            idx,
-            key,
-        })),
-    ];
+export default function CardPicker({
+    target,
+    label,
+    onPick,
+    handOnly = false,
+}: CardPickerProps) {
+    const allCards: CardPick[] = handOnly
+        ? [
+              ...shuffle(
+                  target.hand.map((key, idx) => ({
+                      source: 'hand' as CardPickSource,
+                      idx,
+                      key,
+                  })),
+              ),
+          ]
+        : [
+              ...shuffle(
+                  target.hand.map((key, idx) => ({
+                      source: 'hand' as CardPickSource,
+                      idx,
+                      key,
+                  })),
+              ),
+              ...target.inPlay.map((key, idx) => ({
+                  source: 'inPlay' as CardPickSource,
+                  idx,
+                  key,
+              })),
+          ];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}

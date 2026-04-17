@@ -103,23 +103,32 @@ function isEnemy(state: GameState, from: number, to: number) {
         return t.role === 'OUTLAW' || t.role === 'RENEGADE';
     if (f.role === 'OUTLAW') return t.role === 'SHERIFF' || t.role === 'DEPUTY';
     if (f.role === 'RENEGADE') {
-        const numberOfDeputies = state.players.filter(
-            (p) => p.alive && p.role === 'DEPUTY',
+        const alivePlayers = state.players.filter(
+            (p) => p.alive && p.id !== f.id,
+        );
+        if (alivePlayers.length === 1 && alivePlayers[0].role === 'SHERIFF') {
+            return t.role === 'SHERIFF';
+        }
+
+        const numberOfDeputies = alivePlayers.filter(
+            (p) => p.role === 'DEPUTY',
         ).length;
-        const numberOfOutlaws = state.players.filter(
-            (p) => p.alive && p.role === 'OUTLAW',
+        const numberOfOutlaws = alivePlayers.filter(
+            (p) => p.role === 'OUTLAW',
         ).length;
-        if (numberOfDeputies === numberOfOutlaws) {
-            return t.role === 'DEPUTY' || t.role === 'OUTLAW';
+
+        if (t.role === 'SHERIFF') return false;
+
+        if (numberOfOutlaws > numberOfDeputies) {
+            return t.role === 'OUTLAW';
         } else if (numberOfDeputies > numberOfOutlaws) {
             return t.role === 'DEPUTY';
-        } else if (numberOfDeputies === 0 && numberOfOutlaws === 0) {
-            return t.role === 'SHERIFF';
         } else {
-            return t.role === 'OUTLAW';
+            return true;
         }
     }
-    return t.role !== 'RENEGADE';
+
+    return false;
 }
 
 function validateCardChecksum(state: GameState) {

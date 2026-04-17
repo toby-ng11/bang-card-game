@@ -6,21 +6,30 @@ const aiPickCardFrom = (
     state: GameState,
     target: Player,
     perspective: Player,
-    actionCardKey: CardKey,
+    actionCardKey: CardKey | null,
+    handOnly = false,
 ): CardPick | null => {
     // perspective = the AI player doing the action
-    const allCards: CardPick[] = [
-        ...target.hand.map((c, i) => ({
-            source: 'hand' as const,
-            idx: i,
-            key: c,
-        })),
-        ...target.inPlay.map((c, i) => ({
-            source: 'inPlay' as const,
-            idx: i,
-            key: c,
-        })),
-    ];
+    const allCards: CardPick[] = handOnly
+        ? [
+              ...target.hand.map((c, i) => ({
+                  source: 'hand' as const,
+                  idx: i,
+                  key: c,
+              })),
+          ]
+        : [
+              ...target.hand.map((c, i) => ({
+                  source: 'hand' as const,
+                  idx: i,
+                  key: c,
+              })),
+              ...target.inPlay.map((c, i) => ({
+                  source: 'inPlay' as const,
+                  idx: i,
+                  key: c,
+              })),
+          ];
     if (!allCards.length) return null;
 
     // priority: steal/discard mustang if it's blocking range, else scope, else random
@@ -58,7 +67,11 @@ const aiPickCardFrom = (
     const inPlayCards = allCards.filter((c) => c.source === 'inPlay');
 
     // prefer stealing hand cards for panic, inPlay for catbalou
-    if (actionCardKey === 'panic') {
+    if (actionCardKey === null) {
+        return handCards.length
+            ? handCards[Math.floor(Math.random() * handCards.length)]
+            : null;
+    } else if (actionCardKey === 'panic') {
         return handCards.length
             ? handCards[Math.floor(Math.random() * handCards.length)]
             : inPlayCards[0];

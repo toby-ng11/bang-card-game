@@ -8,7 +8,10 @@ import { showBanner, triggerPopup, wait } from './animation';
 
 const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
     return useEffect(() => {
-        const reactor = G.players.find((p) => p.id === G.reactorId[0]);
+        const [currentAction] = G.pendingAction;
+        const reactor = G.players.find(
+            (p) => p.id === currentAction?.reactorId[0],
+        );
 
         if (G.phase === 'dying' && reactor && !reactor.isHuman) {
             const aiDelay = setTimeout(() => {
@@ -20,21 +23,16 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     dispatch({
                         type: 'DRINK_BEER_TO_SURVIVE',
                         playerId: reactor.id,
-                        prevPhase: G.pendingAction?.type
-                            ? G.pendingAction?.type
-                            : 'play',
                     });
                 } else {
                     // No more beers and HP <= 0? Dead.
                     dispatch({
                         type: 'TAKE_DAMAGE',
-                        sourceId: G.pendingAction?.sourceId ?? null,
+                        sourceId: currentAction?.sourceId ?? null,
                         targetId: reactor.id,
                         damageAmount: 999,
                     });
                 }
-
-                dispatch({ type: 'FINISH_ACTION' });
             }, 1000); // 1 second between beers for dramatic effect
 
             return () => clearTimeout(aiDelay);
@@ -58,25 +56,25 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                             type: 'PLAY_CARD',
                             cardKey: 'missed',
                             sourceId: reactor.id,
-                            targetId: G.pendingAction?.targetId ?? null,
+                            targetId: currentAction?.targetId[0] ?? null,
                         });
                     } else {
                         triggerPopup(reactor.id, 'bang', 'damage', dispatch);
                         dispatch({
                             type: 'TAKE_DAMAGE',
-                            sourceId: G.pendingAction?.sourceId ?? null,
+                            sourceId: currentAction?.sourceId ?? null,
                             targetId: reactor.id,
                             damageAmount: 1,
                         });
 
                         await handlePostDamageAbilities(
+                            G,
                             reactor,
-                            G.pendingAction?.sourceId ?? null,
+                            currentAction?.sourceId,
                             dispatch,
                         );
                     }
                 }
-                dispatch({ type: 'FINISH_ACTION' });
             }, 1000);
 
             return () => clearTimeout(aiDelay);
@@ -84,7 +82,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
         if (G.phase === 'gatling' && reactor) {
             const aiDelay = setTimeout(async () => {
-                const sourceId = G.pendingAction?.sourceId;
+                const sourceId = currentAction?.sourceId;
                 if (sourceId !== undefined) {
                     dispatch({
                         type: 'TRIGGER_FLOAT',
@@ -115,7 +113,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                             type: 'PLAY_CARD',
                             cardKey: 'missed',
                             sourceId: reactor.id,
-                            targetId: G.pendingAction?.targetId ?? null,
+                            targetId: null,
                         });
                     } else {
                         // Take damage popup
@@ -123,19 +121,19 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
                         dispatch({
                             type: 'TAKE_DAMAGE',
-                            sourceId: G.pendingAction?.sourceId ?? null,
+                            sourceId: currentAction?.sourceId ?? null,
                             targetId: reactor.id,
                             damageAmount: 1,
                         });
 
                         await handlePostDamageAbilities(
+                            G,
                             reactor,
-                            G.pendingAction?.sourceId ?? null,
+                            currentAction?.sourceId,
                             dispatch,
                         );
                     }
                 }
-                dispatch({ type: 'FINISH_ACTION' });
             }, 1000);
             return () => clearTimeout(aiDelay);
         }
@@ -143,7 +141,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
         if (G.phase === 'indians' && reactor) {
             const aiDelay = setTimeout(async () => {
                 const hasBang = reactor.hand.includes('bang');
-                const sourceId = G.pendingAction?.sourceId;
+                const sourceId = currentAction?.sourceId;
 
                 if (sourceId !== undefined) {
                     dispatch({
@@ -170,19 +168,18 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
                     dispatch({
                         type: 'TAKE_DAMAGE',
-                        sourceId: G.pendingAction?.sourceId ?? null,
+                        sourceId: currentAction?.sourceId ?? null,
                         targetId: reactor.id,
                         damageAmount: 1,
                     });
 
                     await handlePostDamageAbilities(
+                        G,
                         reactor,
-                        G.pendingAction?.sourceId ?? null,
+                        currentAction?.sourceId,
                         dispatch,
                     );
                 }
-
-                dispatch({ type: 'FINISH_ACTION' });
             }, 1000);
             return () => clearTimeout(aiDelay);
         }
@@ -205,19 +202,18 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
                     dispatch({
                         type: 'TAKE_DAMAGE',
-                        sourceId: G.pendingAction?.sourceId ?? null,
+                        sourceId: currentAction?.sourceId ?? null,
                         targetId: reactor.id,
                         damageAmount: 1,
                     });
 
                     await handlePostDamageAbilities(
+                        G,
                         reactor,
-                        G.pendingAction?.sourceId ?? null,
+                        currentAction?.sourceId,
                         dispatch,
                     );
                 }
-
-                dispatch({ type: 'FINISH_ACTION' });
             }, 1000);
             return () => clearTimeout(aiDelay);
         }
@@ -239,8 +235,6 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     type: 'RESOLVE_SALOON',
                     playerId: reactor.id,
                 });
-
-                dispatch({ type: 'FINISH_ACTION' });
             }, 1000);
             return () => clearTimeout(aiDelay);
         }
@@ -280,7 +274,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
             }
         }
 
-        const currentCardPickerId = G.pendingAction?.sourceId;
+        const currentCardPickerId = currentAction?.sourceId;
         const currentCardPicker = G.players.find(
             (p) => p.id === currentCardPickerId,
         );
@@ -345,11 +339,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
     }, [
         G,
         G.phase,
-        G.reactorId,
         G.players,
-        G.pendingAction?.type,
-        G.pendingAction?.sourceId,
-        G.pendingAction?.targetId,
         G.generalStoreCards,
         G.generalStoreIndex,
         G.generalStoreOrder,

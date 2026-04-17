@@ -38,6 +38,8 @@ export default function ActionButtons({
         selectedCardKey !== null &&
         ['bang', 'panic', 'catbalou', 'duel'].includes(selectedCardKey);
 
+    const [currentAction] = G.pendingAction;
+
     return (
         <div className="flex w-full flex-col justify-center gap-2">
             {/* Draw phase */}
@@ -102,7 +104,7 @@ export default function ActionButtons({
                     )}
                 </>
             )}
-            {G.phase === 'duel' && G.reactorId[0] === human.id && (
+            {G.phase === 'duel' && currentAction.reactorId[0] === human.id && (
                 <div className="flex animate-in flex-col items-center gap-4 duration-300 fade-in zoom-in">
                     {/* Duel Info Header */}
                     <div className="flex flex-col items-center rounded-2xl border border-red-500/30 bg-red-950/40 p-4 text-center shadow-xl backdrop-blur-md">
