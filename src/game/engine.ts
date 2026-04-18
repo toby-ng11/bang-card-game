@@ -2,7 +2,6 @@ import { CARD_DEFS } from '@/definitions/cards';
 import { GameAction } from '@/gameReducer';
 import { GameState } from '@/types';
 import { Dispatch, useEffect } from 'react';
-import { handlePostDamageAbilities } from './ability-helpers';
 import { aiPickCardFrom } from './ai';
 import { showBanner, triggerPopup, wait } from './animation';
 
@@ -13,7 +12,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
             (p) => p.id === currentAction?.reactorId[0],
         );
 
-        if (G.phase === 'dying' && reactor && !reactor.isHuman) {
+        if (G.phase === 'dying' && reactor) {
             const aiDelay = setTimeout(() => {
                 const hasBeer = reactor.hand.includes('beer');
 
@@ -66,13 +65,6 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                             targetId: reactor.id,
                             damageAmount: 1,
                         });
-
-                        await handlePostDamageAbilities(
-                            G,
-                            reactor,
-                            currentAction?.sourceId,
-                            dispatch,
-                        );
                     }
                 }
             }, 1000);
@@ -125,13 +117,6 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                             targetId: reactor.id,
                             damageAmount: 1,
                         });
-
-                        await handlePostDamageAbilities(
-                            G,
-                            reactor,
-                            currentAction?.sourceId,
-                            dispatch,
-                        );
                     }
                 }
             }, 1000);
@@ -172,13 +157,6 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         targetId: reactor.id,
                         damageAmount: 1,
                     });
-
-                    await handlePostDamageAbilities(
-                        G,
-                        reactor,
-                        currentAction?.sourceId,
-                        dispatch,
-                    );
                 }
             }, 1000);
             return () => clearTimeout(aiDelay);
@@ -206,13 +184,6 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         targetId: reactor.id,
                         damageAmount: 1,
                     });
-
-                    await handlePostDamageAbilities(
-                        G,
-                        reactor,
-                        currentAction?.sourceId,
-                        dispatch,
-                    );
                 }
             }, 1000);
             return () => clearTimeout(aiDelay);

@@ -23,7 +23,6 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { FloatAnimation } from './components/FloatLayer';
 import { BattleLogPanel } from './components/GameLogPanel';
 import PopupLayer from './components/PopupLayer';
-import { handlePostDamageAbilities } from './game/ability-helpers';
 import { aiPickCardFrom, getAIDiscardCard } from './game/ai';
 import { getGunScore } from './game/combat';
 import { usePhaseResolver } from './game/engine';
@@ -114,6 +113,7 @@ export default function App() {
                 bangUsed: state.bangUsed,
                 alive: state.players[targetId].alive,
                 cardPick: state.cardPickerTarget,
+                pending: state.pendingAction,
             });
             if (!state.targeting || state.selectedCard === null) return;
 
@@ -765,35 +765,40 @@ export default function App() {
                             </div>
                         )}
 
-                        {G.cardPickerPicking && G.cardPickerTarget !== null && (
-                            <div className="absolute inset-0 z-40 flex items-center justify-center rounded-[100px]">
-                                <CardPicker
-                                    target={G.players[G.cardPickerTarget]}
-                                    label={G.cardPickerLabel}
-                                    handOnly={
-                                        G.phase === 'el_gringo' ? true : false
-                                    }
-                                    onPick={async (picked) => {
-                                        if (
-                                            currentAction.type === 'el_gringo'
-                                        ) {
-                                            dispatch({
-                                                type: 'TRIGGER_FLOAT',
-                                                cardKey: picked.key,
-                                                fromId: currentAction
-                                                    .targetId[0],
-                                                toId: human.id,
-                                            });
-
-                                            await wait(1000);
-                                            handleCardPickerPick(picked);
-                                        } else {
-                                            handleCardPickerPick(picked);
+                        {G.cardPickerPicking &&
+                            G.cardPickerTarget !== null &&
+                            currentAction?.reactorId[0] === human.id && (
+                                <div className="absolute inset-0 z-40 flex items-center justify-center rounded-[100px]">
+                                    <CardPicker
+                                        target={G.players[G.cardPickerTarget]}
+                                        label={G.cardPickerLabel}
+                                        handOnly={
+                                            G.phase === 'el_gringo'
+                                                ? true
+                                                : false
                                         }
-                                    }}
-                                />
-                            </div>
-                        )}
+                                        onPick={async (picked) => {
+                                            if (
+                                                currentAction.type ===
+                                                'el_gringo'
+                                            ) {
+                                                dispatch({
+                                                    type: 'TRIGGER_FLOAT',
+                                                    cardKey: picked.key,
+                                                    fromId: currentAction
+                                                        .targetId[0],
+                                                    toId: human.id,
+                                                });
+
+                                                await wait(1000);
+                                                handleCardPickerPick(picked);
+                                            } else {
+                                                handleCardPickerPick(picked);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            )}
                     </AnimatePresence>
                 </div>
             </main>
@@ -854,17 +859,6 @@ export default function App() {
                                     targetId: human.id,
                                     damageAmount: 1,
                                 });
-
-                                await handlePostDamageAbilities(
-                                    G,
-                                    human,
-                                    G.pendingAction.filter(
-                                        (a) => a.type === 'duel',
-                                    )[0].sourceId ?? null,
-                                    dispatch,
-                                );
-
-                                dispatch({ type: 'FINISH_ACTION' });
                             }}
                             onEndTurn={handleEndTurn}
                             onCancelEndTurn={handleCancelEndTurn}

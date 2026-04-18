@@ -1,5 +1,6 @@
 // components/game/GameCard.tsx
 import { CARD_DEFS } from '@/definitions/cards';
+import { cn } from '@/lib/utils';
 import { CardKey } from '@/types';
 
 export default function GameCard({
@@ -19,7 +20,14 @@ export default function GameCard({
 
     return (
         <div
-            className={`${sizeClasses[size]} relative flex flex-col items-center justify-between rounded-xl border-2 border-stone-800 bg-stone-100 p-2 shadow-lg transition-transform hover:-translate-y-2`}
+            className={cn(
+                'relative flex flex-col items-center justify-between rounded-xl border-2 border-stone-800 bg-stone-100 p-2 shadow-lg transition-transform hover:-translate-y-2',
+                sizeClasses[size],
+                card.color === 'brown' &&
+                    'border-amber-800 bg-linear-to-br from-amber-100 to-amber-200 text-amber-950',
+                card.color === 'blue' &&
+                    'border-blue-800 bg-linear-to-br from-blue-100 to-blue-200 text-blue-950',
+            )}
         >
             {/* Card Suit/Value Corner */}
             <div className="absolute top-1 left-1 flex flex-col items-center leading-none font-bold text-stone-800">

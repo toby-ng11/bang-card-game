@@ -1,10 +1,10 @@
 // GameLog component stays the same, changes are in the aside wrapper
 
 import { ChevronLeft, ChevronRight, History } from 'lucide-react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import GameLog from './GameLog';
 
-export function BattleLogPanel({ log }: { log: string[] }) {
+export const BattleLogPanel = memo(({ log }: { log: string[] }) => {
     const [isOpen, setIsOpen] = useState(true);
 
     return (
@@ -53,4 +53,4 @@ export function BattleLogPanel({ log }: { log: string[] }) {
             </button>
         </div>
     );
-}
+});

@@ -102,13 +102,28 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 activePopups: [...state.activePopups, { ...action.payload }],
             };
 
-        case 'REMOVE_POPUP':
+        case 'REMOVE_POPUP': {
+            const newState = structuredClone(state);
+            const [currentAction, ...otherActions] = newState.pendingAction;
+
+            if (currentAction?.type !== 'ability')
+                return {
+                    ...newState,
+                    activePopups: newState.activePopups.filter(
+                        (p) => p.id !== action.id,
+                    ),
+                };
+
             return {
-                ...state,
-                activePopups: state.activePopups.filter(
+                ...newState,
+                pendingAction: [...otherActions],
+                phase:
+                    otherActions.length === 0 ? 'play' : otherActions[0].type,
+                activePopups: newState.activePopups.filter(
                     (p) => p.id !== action.id,
                 ),
             };
+        }
 
         case 'TRIGGER_FLOAT':
             return {
@@ -300,7 +315,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         case 'FINISH_ACTION': {
             const newState = structuredClone(state);
             const [actionToClear, ...updatedActions] = newState.pendingAction;
-            const isReacting = actionToClear.reactorId.length > 0;
+            const isReacting = actionToClear?.reactorId.length > 0;
 
             return {
                 ...newState,
@@ -329,7 +344,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             const newHp = player.hp + 1;
             const isNowSafe = newHp > 0;
 
-            const [, ...updatedActions] = newState.pendingAction;
+            const [, ...otherActions] = newState.pendingAction;
             //const newReactors = newState.reactorId.filter((p) => p !== playerId);
 
             return {
@@ -338,9 +353,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 discardPile: ['beer', ...newState.discardPile],
                 // If they are still at 0 (e.g. they took 3 dmg from Dynamite),
                 // they stay in 'dying' phase until they play another beer or click 'die'.
-                phase: isNowSafe ? updatedActions[0].type : 'dying',
+                phase: isNowSafe
+                    ? otherActions.length > 0
+                        ? otherActions[0].type
+                        : 'play'
+                    : 'dying',
                 pendingAction: isNowSafe
-                    ? [...updatedActions]
+                    ? [...otherActions]
                     : newState.pendingAction,
                 log: [
                     `${state.players[playerId].name} drank a beer to stay alive!`,
@@ -388,11 +407,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ...newState,
                         players: updatedPlayers,
                         phase: 'dying',
-                        pendingAction: [
-                            newAction,
-                            currentAction,
-                            ...otherActions,
-                        ], // They are the one who needs to drink
+                        pendingAction:
+                            updatedAction.reactorId.length > 0
+                                ? [newAction, updatedAction, ...otherActions]
+                                : [newAction, ...otherActions], // They are the one who needs to drink
                         log: [
                             `${targetPlayer.name} is at death's door! Play a Beer?`,
                             ...newState.log,
@@ -403,13 +421,59 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     return handleElimination(
                         {
                             ...newState,
-                            pendingAction: [updatedAction],
+                            pendingAction:
+                                updatedAction.reactorId.length > 0
+                                    ? [updatedAction, ...otherActions]
+                                    : otherActions,
+                            phase:
+                                updatedAction.reactorId.length === 0
+                                    ? otherActions.length === 0
+                                        ? 'play'
+                                        : otherActions[0].type
+                                    : updatedAction.type,
                         },
                         updatedPlayers,
                         targetId,
                         sourceId,
-                        updatedAction,
                     );
+                }
+            }
+
+            // handle post damage character ability
+            if (targetPlayer.character === 'el_gringo' && sourceId !== null) {
+                const attacker = updatedPlayers[sourceId];
+                if (attacker && attacker.hand.length > 0) {
+                    const newElGringoAction: PlayerAction = {
+                        type: 'el_gringo',
+                        sourceId: targetId,
+                        targetId: [attacker.id],
+                        reactorId: [targetId],
+                    };
+
+                    const newActions: PlayerAction[] = new Array(
+                        damageAmount,
+                    ).fill(newElGringoAction);
+
+                    return {
+                        ...newState,
+                        players: updatedPlayers,
+                        pendingAction:
+                            updatedAction.reactorId.length > 0
+                                ? [
+                                      ...newActions,
+                                      updatedAction,
+                                      ...otherActions,
+                                  ]
+                                : [...newActions, ...otherActions],
+                        phase: 'el_gringo',
+                        cardPickerPicking: true,
+                        cardPickerTarget: attacker.id,
+                        cardPickerLabel: `Steal a card from ${attacker.name}`,
+                        log: [
+                            `${targetPlayer.name} took ${damageAmount} damage. ${targetPlayer.name} use ${CHARACTER_DEFS[targetPlayer.character].name} ability!`,
+                            ...newState.log,
+                        ],
+                    };
                 }
             }
 
@@ -421,10 +485,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ? [updatedAction, ...otherActions]
                         : otherActions,
                 phase:
-                    updatedAction.reactorId.length === 0 &&
-                    otherActions.length === 0
-                        ? 'play'
-                        : currentAction?.type,
+                    updatedAction.reactorId.length === 0
+                        ? otherActions.length === 0
+                            ? 'play'
+                            : otherActions[0].type
+                        : updatedAction.type,
                 //pendingAction: null,
                 log: [
                     `${targetPlayer.name} took ${damageAmount} damage!`,
@@ -455,7 +520,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
         case 'RESOLVE_CARD_PICK': {
             const newState = structuredClone(state);
-            const [currentAction, ...otherAction] = newState.pendingAction;
+            const [currentAction, ...otherActions] = newState.pendingAction;
             if (
                 currentAction?.type !== 'panic' &&
                 currentAction?.type !== 'catbalou' &&
@@ -491,6 +556,12 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 }
                 return p;
             });
+
+            const updatedAction = removeReactorFromCurrentAction(
+                currentAction,
+                sourceId,
+            );
+
             return {
                 ...newState,
                 players: updatedPlayers,
@@ -499,10 +570,18 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ? [key, ...newState.discardPile]
                         : newState.discardPile,
 
-                phase: otherAction.length > 0 ? otherAction[0].type : 'play',
+                phase:
+                    updatedAction.reactorId.length === 0
+                        ? otherActions.length === 0
+                            ? 'play'
+                            : otherActions[0].type
+                        : updatedAction.type,
                 cardPickerPicking: false,
                 cardPickerTarget: null,
-                pendingAction: [...otherAction],
+                pendingAction:
+                    updatedAction.reactorId.length > 0
+                        ? [updatedAction, ...otherActions]
+                        : otherActions,
                 log: [
                     `${sourcePlayer.name} ${type === 'catbalou' ? 'discard' : 'stole'} a ${CARD_DEFS[key].name} from ${targetPlayer.name}.`,
                     ...newState.log,
@@ -566,10 +645,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ? [updatedAction, ...otherActions]
                         : otherActions,
                 phase:
-                    updatedAction.reactorId.length === 0 &&
-                    otherActions.length === 0
-                        ? 'play'
-                        : currentAction?.type,
+                    updatedAction.reactorId.length === 0
+                        ? otherActions.length === 0
+                            ? 'play'
+                            : otherActions[0].type
+                        : updatedAction.type,
             };
         }
 
@@ -594,10 +674,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ? [updatedAction, ...otherActions]
                         : otherActions,
                 phase:
-                    updatedAction.reactorId.length === 0 &&
-                    otherActions.length === 0
-                        ? 'play'
-                        : currentAction?.type,
+                    updatedAction.reactorId.length === 0
+                        ? otherActions.length === 0
+                            ? 'play'
+                            : otherActions[0].type
+                        : updatedAction.type,
                 log: [
                     `${newState.players[playerId].name} discard a BANG! and dodge.`,
                     ...newState.log,
@@ -655,10 +736,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ? [updatedAction, ...otherActions]
                         : otherActions,
                 phase:
-                    updatedAction.reactorId.length === 0 &&
-                    otherActions.length === 0
-                        ? 'play'
-                        : currentAction?.type,
+                    updatedAction.reactorId.length === 0
+                        ? otherActions.length === 0
+                            ? 'play'
+                            : otherActions[0].type
+                        : updatedAction.type,
             };
         }
 
@@ -683,10 +765,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ? [updatedAction, ...otherActions]
                         : otherActions,
                 phase:
-                    updatedAction.reactorId.length === 0 &&
-                    otherActions.length === 0
-                        ? 'play'
-                        : currentAction?.type,
+                    updatedAction.reactorId.length === 0
+                        ? otherActions.length === 0
+                            ? 'play'
+                            : otherActions[0].type
+                        : updatedAction.type,
                 log: [
                     `${state.players[playerId].name} successfully use Barrel and dodge a BANG!.`,
                     ...state.log,
@@ -781,7 +864,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                                 type: cardKey,
                                 sourceId: sourceId,
                                 targetId: [targetId],
-                                reactorId: [],
+                                reactorId: [sourceId],
                             };
 
                             return {
@@ -1183,22 +1266,33 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     return newState;
                 }
                 case 'el_gringo': {
-                    if (targetId === null) return { ...state };
+                    const [currentAction, ...otherActions] =
+                        newState.pendingAction;
+                    if (
+                        currentAction.type !== 'el_gringo' ||
+                        targetId === null
+                    ) {
+                        return newState;
+                    }
 
                     const targetPlayer = newState.players[targetId];
-                    const newAction: PlayerAction = {
-                        type: characterKey,
-                        sourceId: sourceId,
-                        targetId: [targetId],
-                        reactorId: [],
-                    };
+                    const updatedAction = removeReactorFromCurrentAction(
+                        currentAction,
+                        sourceId,
+                    );
+
                     return {
                         ...newState,
-                        phase: characterKey,
-                        cardPickerPicking: true,
-                        cardPickerTarget: targetId,
-                        cardPickerLabel: `Steal a card from ${targetPlayer.name}`,
-                        pendingAction: [newAction, ...newState.pendingAction],
+                        pendingAction:
+                            updatedAction.reactorId.length > 0
+                                ? [updatedAction, ...otherActions]
+                                : otherActions,
+                        phase:
+                            updatedAction.reactorId.length === 0
+                                ? otherActions.length === 0
+                                    ? 'play'
+                                    : otherActions[0].type
+                                : updatedAction.type,
                         log: [
                             `${sourcePlayer.name} use ${character.name}'s ability! Draw 1 card from ${targetPlayer.name}'s hand.`,
                             ...newState.log,
@@ -1266,14 +1360,13 @@ function handleElimination(
     players: Player[],
     deadId: number,
     killerId: number | null,
-    pendingAction: PlayerAction | null,
 ): GameState {
     let originalState = structuredClone(state);
     const deadPlayer = players[deadId];
     const killer = killerId !== null ? players[killerId] : null;
 
     // 1. Mark player as eliminated
-    let updatedPlayers = players.map((p) =>
+    originalState.players = originalState.players.map((p) =>
         p.id === deadId
             ? {
                   ...p,
@@ -1288,7 +1381,7 @@ function handleElimination(
 
     // 2. MOVE dead player's cards to discard pile
     const cardsToDiscard = [...deadPlayer.hand, ...deadPlayer.inPlay];
-    let newDiscard = [...cardsToDiscard, ...originalState.discardPile];
+    originalState.discardPile = [...cardsToDiscard, ...originalState.discardPile];
 
     // 3. BANG! BOUNTY RULES
     if (killer) {
@@ -1296,22 +1389,22 @@ function handleElimination(
         if (deadPlayer.role === 'OUTLAW') {
             const { cards, state: newState } = dealN(originalState, 3);
             originalState = newState;
-            updatedPlayers = updatedPlayers.map((p) =>
+            originalState.players = originalState.players.map((p) =>
                 p.id === killerId ? { ...p, hand: [...p.hand, ...cards] } : p,
             );
         }
 
         // Rule: Sheriff kills a Deputy -> Sheriff loses EVERYTHING
         if (killer.role === 'SHERIFF' && deadPlayer.role === 'DEPUTY') {
-            updatedPlayers = updatedPlayers.map((p) =>
+            originalState.players = originalState.players.map((p) =>
                 p.id === killerId ? { ...p, hand: [], inPlay: [] } : p,
             );
-            newDiscard = [...killer.hand, ...killer.inPlay, ...newDiscard];
+            originalState.discardPile = [...killer.hand, ...killer.inPlay, ...originalState.discardPile];
         }
     }
 
     // 4. CHECK WIN CONDITIONS
-    const aliveRoles = updatedPlayers.filter((p) => p.alive).map((p) => p.role);
+    const aliveRoles = originalState.players.filter((p) => p.alive).map((p) => p.role);
     let gameOverMessage = null;
     let gameWinner: Role | null = null;
 
@@ -1346,16 +1439,9 @@ function handleElimination(
 
     return {
         ...originalState,
-        players: updatedPlayers,
-        discardPile: newDiscard,
         over: gameOverMessage !== null ? true : false,
         turn: killerId === deadId ? next : state.turn, // self kill
         winner: gameWinner,
-        phase: gameOverMessage
-            ? 'game-over'
-            : pendingAction
-              ? pendingAction.type
-              : 'play',
         log: [
             `${deadPlayer.name} is DEAD. They were a ${deadPlayer.role}.`,
             ...state.log,

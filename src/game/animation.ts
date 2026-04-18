@@ -1,4 +1,3 @@
-import { CARD_DEFS } from '@/definitions/cards';
 import { GameAction } from '@/gameReducer';
 import { CardKey } from '@/types';
 import { Dispatch } from 'react';
@@ -27,34 +26,8 @@ const triggerPopup = (
     }, 1500);
 };
 
-function popupOnPlayer(
-    pid: number,
-    cardKey: CardKey,
-    variant: string,
-): Promise<void> {
-    const row = document.querySelector(`[data-pid="${pid}"]`) as HTMLDivElement;
-    if (!row) return Promise.resolve();
-    const c = CARD_DEFS[cardKey];
-    const el = document.createElement('div');
-    el.className = `popup-card ${variant}`;
-    el.innerHTML = `
-    <span style="font-size:22px;">${c ? c.icon : '?'}</span>
-    <span style="font-size:9px;margin-top:2px;">${c ? c.name : ''}</span>
-  `;
-    row.appendChild(el);
-    requestAnimationFrame(() =>
-        requestAnimationFrame(() => el.classList.add('show')),
-    );
-    return new Promise<void>((res) =>
-        setTimeout(() => {
-            el.remove();
-            res();
-        }, 1100),
-    );
-}
-
 const wait = (ms: number): Promise<void> => {
     return new Promise((r) => setTimeout(r, ms));
 };
 
-export { popupOnPlayer, showBanner, triggerPopup, wait };
+export { showBanner, triggerPopup, wait };
