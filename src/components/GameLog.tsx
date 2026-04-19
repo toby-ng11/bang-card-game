@@ -21,8 +21,6 @@ export default function GameLog({ log }: { log: string[] }) {
                     return (
                         <motion.div
                             key={`${entry}-${crypto.randomUUID()}`}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
                             className={cn(
                                 'rounded-lg border-l-2 border-amber-700/30 bg-white/5 p-2 text-xs leading-relaxed text-stone-300 transition-colors',
                                 isDamage &&

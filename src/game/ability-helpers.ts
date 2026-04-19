@@ -1,51 +1,35 @@
 import { GameAction } from '@/gameReducer';
-import { GameState, Player } from '@/types';
+import { Player } from '@/types';
+import { Dispatch } from 'react';
 import { triggerPopup, wait } from './animation';
 
-export const handlePostDamageAbilities = async (
-    G: GameState,
-    source: Player,
-    targetId: number | null,
-    dispatch: React.Dispatch<GameAction>,
+export const triggerPostDamageAbility = async (
+    dispatch: Dispatch<GameAction>,
+    reactor: Player,
+    sourceId: number | null | undefined,
+    damageAmount = 1,
 ) => {
-    switch (source.character) {
-        case 'bart_cassidy':
-            await wait(1200);
-            triggerPopup(source.id, 'ability', 'play', dispatch);
-            await wait(1000);
-            dispatch({
-                type: 'TRIGGER_FLOAT',
-                cardKey: 'bang', // Usually show the card back since it's a deck draw
-                fromId: 'deck',
-                toId: source.id,
-                count: 1,
-            });
+    // Only characters who have post-damage triggers go here
+    const validCharacters = ['bart_cassidy', 'el_gringo'];
+    if (!validCharacters.includes(reactor.character)) return;
 
-            await wait(1000);
-            dispatch({
-                type: 'RESOLVE_CHARACTER_ABILITY',
-                characterKey: source.character,
-                sourceId: source.id,
-                targetId: null,
-            });
-            break;
+    triggerPopup(reactor.id, 'ability', 'play', dispatch);
+    await wait(1000);
 
-        case 'el_gringo':
-            await wait(1200);
-            triggerPopup(source.id, 'ability', 'play', dispatch);
-            await wait(1000);
-            if (targetId !== null && targetId !== source.id) {
-                const target = G.players[targetId];
-
-                dispatch({
-                    type: 'RESOLVE_CHARACTER_ABILITY',
-                    characterKey: source.character,
-                    sourceId: source.id,
-                    targetId: target.id,
-                });
-            }
-            break;
-
-        // Add more cases here...
+    if (reactor.character === 'bart_cassidy') {
+        dispatch({
+            type: 'TRIGGER_FLOAT',
+            cardKey: 'bang',
+            fromId: 'deck',
+            toId: reactor.id,
+            count: 1,
+        });
+        dispatch({
+            type: 'RESOLVE_CHARACTER_ABILITY',
+            characterKey: 'bart_cassidy',
+            sourceId: reactor.id,
+            targetId: null,
+            damageAmount,
+        });
     }
 };

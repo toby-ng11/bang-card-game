@@ -56,7 +56,7 @@ export default function App() {
         (i: number) => {
             const isMyTurn = G.players[G.turn].isHuman && G.phase === 'play';
             const [currentAction] = G.pendingAction;
-            const currentReactorId = currentAction?.targetId[0];
+            const currentReactorId = currentAction?.reactorId[0];
             const isMyTurnToReact = currentReactorId === 0;
 
             if ((!isMyTurn && !isMyTurnToReact) || G.targeting) return;
@@ -112,8 +112,7 @@ export default function App() {
                 hand: state.players[targetId].hand,
                 bangUsed: state.bangUsed,
                 alive: state.players[targetId].alive,
-                cardPick: state.cardPickerTarget,
-                pending: state.pendingAction,
+                state: state,
             });
             if (!state.targeting || state.selectedCard === null) return;
 

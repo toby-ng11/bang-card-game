@@ -17,7 +17,7 @@ const triggerPopup = (
     type: 'play' | 'damage' | 'heal' = 'play',
     dispatch: Dispatch<GameAction>,
 ) => {
-    const id = Math.random().toString();
+    const id = `popup-${pid}-${Date.now()}`;
     dispatch({ type: 'ADD_POPUP', payload: { id, pid, cardKey, type } });
 
     // Auto-remove after animation finishes

@@ -72,10 +72,12 @@ export interface CardPick {
 }
 
 export interface PlayerAction {
+    id: string;
     type: CardKey | CharacterKey | 'dying';
     sourceId: number;
     targetId: number[]; // original targets, null if self-target
     reactorId: number[]; // players to react, null if self-target
+    isProcessing: boolean;
 }
 
 // ── Game state ───────────────────────────────────────────────────

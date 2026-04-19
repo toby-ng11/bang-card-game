@@ -52,6 +52,15 @@ function inRange(
 
     return distance(players, from, to) <= reach;
 }
+
+function refillDeck(state: GameState): GameState {
+    const newState = structuredClone(state);
+    newState.discardPile = shuffle(newState.discardPile);
+    newState.deck = [...newState.deck, ...newState.discardPile];
+    newState.discardPile = [];
+    return newState;
+}
+
 function dealN(
     state: GameState,
     n: number,
@@ -223,6 +232,7 @@ export {
     distance,
     inRange,
     isEnemy,
+    refillDeck,
     shuffle,
     validateCardChecksum,
     validateCardFrequencies,

@@ -2,18 +2,36 @@ import { CARD_DEFS } from '@/definitions/cards';
 import { GameAction } from '@/gameReducer';
 import { GameState } from '@/types';
 import { Dispatch, useEffect } from 'react';
+import { triggerPostDamageAbility } from './ability-helpers';
 import { aiPickCardFrom } from './ai';
 import { showBanner, triggerPopup, wait } from './animation';
 
 const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
     return useEffect(() => {
         const [currentAction] = G.pendingAction;
+        if (!currentAction || currentAction.isProcessing) return;
+
         const reactor = G.players.find(
-            (p) => p.id === currentAction?.reactorId[0],
+            (p) => p.id === currentAction.reactorId[0],
         );
+
+        if (G.phase === 'ability' && !reactor) {
+            const timeDelay = setTimeout(async () => {
+                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                triggerPopup(
+                    currentAction?.sourceId,
+                    'ability',
+                    'play',
+                    dispatch,
+                );
+            }, 1200);
+
+            return () => clearTimeout(timeDelay);
+        }
 
         if (G.phase === 'dying' && reactor) {
             const aiDelay = setTimeout(() => {
+                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
                 const hasBeer = reactor.hand.includes('beer');
 
                 if (hasBeer) {
@@ -27,11 +45,12 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     // No more beers and HP <= 0? Dead.
                     dispatch({
                         type: 'TAKE_DAMAGE',
-                        sourceId: currentAction?.sourceId ?? null,
+                        sourceId: currentAction.sourceId ?? null,
                         targetId: reactor.id,
                         damageAmount: 999,
                     });
                 }
+                dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000); // 1 second between beers for dramatic effect
 
             return () => clearTimeout(aiDelay);
@@ -39,34 +58,67 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
         if (G.phase === 'bang' && reactor) {
             const aiDelay = setTimeout(async () => {
-                const hasBarrel = reactor.inPlay.includes('barrel');
-                const chance = 0.25;
-                if (hasBarrel && Math.random() < chance) {
-                    triggerPopup(reactor.id, 'barrel', 'heal', dispatch);
-                    dispatch({
-                        type: 'RESOLVE_BARREL',
-                        playerId: reactor.id,
-                    });
-                } else {
-                    const hasMissed = reactor.hand.includes('missed');
-                    if (hasMissed) {
-                        triggerPopup(reactor.id, 'missed', 'play', dispatch);
-                        dispatch({
-                            type: 'PLAY_CARD',
-                            cardKey: 'missed',
-                            sourceId: reactor.id,
-                            targetId: currentAction?.targetId[0] ?? null,
-                        });
-                    } else {
-                        triggerPopup(reactor.id, 'bang', 'damage', dispatch);
-                        dispatch({
-                            type: 'TAKE_DAMAGE',
-                            sourceId: currentAction?.sourceId ?? null,
-                            targetId: reactor.id,
-                            damageAmount: 1,
-                        });
-                    }
+                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                // 1. ROLL ABILITY / BARREL (Check up to two times)
+                let isBlocked = false;
+                const isLuckyDuke = reactor.character === 'lucky_duke';
+
+                // Roll 1: If Jourdonnais, check Ability
+                if (
+                    reactor.character === 'jourdonnas' &&
+                    Math.random() < 0.25
+                ) {
+                    isBlocked = true;
                 }
+                // Roll 2: If Barrel in play, check Barrel
+                else if (
+                    reactor.inPlay.includes('barrel') &&
+                    Math.random() < (isLuckyDuke ? 0.4375 : 0.25)
+                ) {
+                    isBlocked = true;
+                }
+                if (isBlocked) {
+                    triggerPopup(reactor.id, 'barrel', 'heal', dispatch);
+                    dispatch({ type: 'RESOLVE_BARREL', playerId: reactor.id });
+                    return;
+                }
+
+                // 2. CHECK REACTIONS (Cards)
+                const cardToPlay = reactor.hand.includes('missed')
+                    ? 'missed'
+                    : reactor.character === 'calamity_janet' &&
+                        reactor.hand.includes('bang')
+                      ? 'bang'
+                      : null;
+
+                if (cardToPlay) {
+                    triggerPopup(reactor.id, cardToPlay, 'play', dispatch);
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: cardToPlay,
+                        sourceId: reactor.id,
+                        targetId: null,
+                    });
+                    return;
+                }
+                const damageAmount = 1;
+
+                // 3. DAMAGE FALLBACK
+                triggerPopup(reactor.id, 'bang', 'damage', dispatch);
+                await wait(1000);
+                dispatch({
+                    type: 'TAKE_DAMAGE',
+                    sourceId: currentAction?.sourceId ?? null,
+                    targetId: reactor.id,
+                    damageAmount: damageAmount,
+                });
+
+                await triggerPostDamageAbility(
+                    dispatch,
+                    reactor,
+                    currentAction?.sourceId,
+                    damageAmount,
+                );
             }, 1000);
 
             return () => clearTimeout(aiDelay);
@@ -74,6 +126,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
         if (G.phase === 'gatling' && reactor) {
             const aiDelay = setTimeout(async () => {
+                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
                 const sourceId = currentAction?.sourceId;
                 if (sourceId !== undefined) {
                     dispatch({
@@ -88,44 +141,89 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
                 const hasBarrel = reactor.inPlay.includes('barrel');
                 const chance = 0.25;
-                if (hasBarrel && Math.random() < chance) {
-                    triggerPopup(reactor.id, 'barrel', 'heal', dispatch);
+                const luckyDukeChance = 0.4375;
+                if (
+                    reactor.character === 'jourdonnas' &&
+                    Math.random() < chance
+                ) {
+                    triggerPopup(reactor.id, 'ability', 'play', dispatch);
                     dispatch({
-                        type: 'RESOLVE_BARREL',
-                        playerId: reactor.id,
+                        type: 'RESOLVE_CHARACTER_ABILITY',
+                        characterKey: 'jourdonnas',
+                        sourceId: reactor.id,
+                        targetId: null,
                     });
-                } else {
-                    const hasMissed = reactor.hand.includes('missed');
 
-                    if (hasMissed) {
-                        // Trigger your beautiful popup!
-                        triggerPopup(reactor.id, 'missed', 'play', dispatch);
+                    return;
+                }
 
+                if (hasBarrel) {
+                    if (
+                        reactor.character === 'lucky_duke' &&
+                        Math.random() < luckyDukeChance
+                    ) {
+                        triggerPopup(reactor.id, 'barrel', 'heal', dispatch);
                         dispatch({
-                            type: 'PLAY_CARD',
-                            cardKey: 'missed',
-                            sourceId: reactor.id,
-                            targetId: null,
+                            type: 'RESOLVE_BARREL',
+                            playerId: reactor.id,
                         });
-                    } else {
-                        // Take damage popup
-                        triggerPopup(reactor.id, 'gatling', 'damage', dispatch);
-
+                        return;
+                    } else if (Math.random() < chance) {
+                        triggerPopup(reactor.id, 'barrel', 'heal', dispatch);
                         dispatch({
-                            type: 'TAKE_DAMAGE',
-                            sourceId: currentAction?.sourceId ?? null,
-                            targetId: reactor.id,
-                            damageAmount: 1,
+                            type: 'RESOLVE_BARREL',
+                            playerId: reactor.id,
                         });
+                        return;
                     }
                 }
+
+                let cardToPlay: 'bang' | 'missed' | null = null;
+
+                if (reactor.hand.includes('missed')) {
+                    cardToPlay = 'missed';
+                } else if (
+                    reactor.character === 'calamity_janet' &&
+                    reactor.hand.includes('bang')
+                ) {
+                    cardToPlay = 'bang'; // Janet plays Bang as Missed
+                }
+
+                if (cardToPlay) {
+                    triggerPopup(reactor.id, cardToPlay, 'play', dispatch);
+                    dispatch({
+                        type: 'PLAY_CARD',
+                        cardKey: cardToPlay,
+                        sourceId: reactor.id,
+                        targetId: null,
+                    });
+                } else {
+                    // No reaction possible, take damage
+                    triggerPopup(reactor.id, 'bang', 'damage', dispatch);
+                    await wait(1000);
+                    const damageAmount = 1;
+                    dispatch({
+                        type: 'TAKE_DAMAGE',
+                        sourceId: currentAction?.sourceId ?? null,
+                        targetId: reactor.id,
+                        damageAmount: damageAmount,
+                    });
+
+                    await triggerPostDamageAbility(
+                        dispatch,
+                        reactor,
+                        currentAction?.sourceId,
+                        damageAmount,
+                    );
+                }
+                dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000);
             return () => clearTimeout(aiDelay);
         }
 
         if (G.phase === 'indians' && reactor) {
             const aiDelay = setTimeout(async () => {
-                const hasBang = reactor.hand.includes('bang');
+                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
                 const sourceId = currentAction?.sourceId;
 
                 if (sourceId !== undefined) {
@@ -139,58 +237,103 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
                 await wait(1000);
 
-                if (hasBang) {
+                let cardToDiscard: 'bang' | 'missed' | null = null;
+
+                if (reactor.hand.includes('bang')) {
+                    cardToDiscard = 'bang';
+                } else if (
+                    reactor.character === 'calamity_janet' &&
+                    reactor.hand.includes('missed')
+                ) {
+                    cardToDiscard = 'missed'; // Janet plays Missed as Bang
+                }
+
+                if (cardToDiscard) {
                     // Trigger your beautiful popup!
-                    triggerPopup(reactor.id, 'bang', 'play', dispatch);
+                    triggerPopup(reactor.id, cardToDiscard, 'play', dispatch);
 
                     dispatch({
                         type: 'RESOLVE_INDIANS',
                         playerId: reactor.id,
+                        discardKey: cardToDiscard,
                     });
                 } else {
                     // Take damage popup
                     triggerPopup(reactor.id, 'indians', 'damage', dispatch);
-
+                    await wait(1000);
+                    const damageAmount = 1;
                     dispatch({
                         type: 'TAKE_DAMAGE',
                         sourceId: currentAction?.sourceId ?? null,
                         targetId: reactor.id,
-                        damageAmount: 1,
+                        damageAmount: damageAmount,
                     });
+
+                    await triggerPostDamageAbility(
+                        dispatch,
+                        reactor,
+                        currentAction?.sourceId,
+                        damageAmount,
+                    );
                 }
+                dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000);
             return () => clearTimeout(aiDelay);
         }
 
         if (G.phase === 'duel' && reactor && !reactor.isHuman) {
             const aiDelay = setTimeout(async () => {
-                const hasBang = reactor.hand.includes('bang');
+                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                let cardToDiscard: 'bang' | 'missed' | null = null;
 
-                if (hasBang) {
+                if (reactor.hand.includes('bang')) {
+                    cardToDiscard = 'bang';
+                } else if (
+                    reactor.character === 'calamity_janet' &&
+                    reactor.hand.includes('missed')
+                ) {
+                    cardToDiscard = 'missed'; // Janet plays Missed as Bang
+                }
+
+                if (cardToDiscard) {
                     // Trigger your beautiful popup!
-                    triggerPopup(reactor.id, 'bang', 'play', dispatch);
+                    triggerPopup(reactor.id, cardToDiscard, 'play', dispatch);
 
                     dispatch({
                         type: 'RESOLVE_DUEL',
                         playerId: reactor.id,
+                        discardKey: cardToDiscard,
                     });
                 } else {
                     // Take damage popup
                     triggerPopup(reactor.id, 'duel', 'damage', dispatch);
-
+                    await wait(1000);
+                    const damageAmount = 1;
                     dispatch({
                         type: 'TAKE_DAMAGE',
                         sourceId: currentAction?.sourceId ?? null,
                         targetId: reactor.id,
-                        damageAmount: 1,
+                        damageAmount: damageAmount,
                     });
+
+                    await triggerPostDamageAbility(
+                        dispatch,
+                        reactor,
+                        currentAction?.sourceId,
+                        damageAmount,
+                    );
                 }
+                dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000);
             return () => clearTimeout(aiDelay);
         }
 
         if (G.phase === 'saloon' && reactor) {
             const aiDelay = setTimeout(() => {
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
                 // Trigger your beautiful popup!
                 triggerPopup(reactor.id, 'beer', 'heal', dispatch);
 
@@ -206,7 +349,9 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     type: 'RESOLVE_SALOON',
                     playerId: reactor.id,
                 });
+                dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000);
+
             return () => clearTimeout(aiDelay);
         }
 
@@ -223,6 +368,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
             const availableCards = G.generalStoreCards;
             if (availableCards && availableCards.length > 0) {
                 const aiDelay = setTimeout(async () => {
+                    dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
                     // AI Logic: Priority is 'bang', otherwise take the first available card
                     const pick = availableCards.includes('bang')
                         ? 'bang'
@@ -239,6 +385,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         `${currentGeneralStorePicker.name} picks ${CARD_DEFS[pick]?.name || pick}.`,
                         700,
                     );
+                    dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
                 }, 1200); // Slightly longer delay than reaction to feel more "natural"
 
                 return () => clearTimeout(aiDelay);
@@ -255,22 +402,47 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
         );
 
         if (
-            (G.phase === 'panic' || G.phase === 'catbalou') &&
+            (G.phase === 'panic' ||
+                G.phase === 'catbalou' ||
+                G.phase === 'el_gringo') &&
             currentCardPicker &&
             !currentCardPicker.isHuman &&
             currentCardPickerTarget
         ) {
-            const cardKey = G.phase;
+            const cardKey = G.phase === 'el_gringo' ? null : G.phase;
             const aiDelay = setTimeout(async () => {
-                const picked = aiPickCardFrom(
-                    G,
-                    currentCardPickerTarget,
-                    currentCardPicker,
-                    cardKey,
-                );
+                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                const picked =
+                    G.phase === 'el_gringo'
+                        ? aiPickCardFrom(
+                              G,
+                              currentCardPickerTarget,
+                              currentCardPicker,
+                              cardKey,
+                              true,
+                          )
+                        : aiPickCardFrom(
+                              G,
+                              currentCardPickerTarget,
+                              currentCardPicker,
+                              cardKey,
+                          );
 
                 if (picked !== null) {
-                    if (G.phase === 'panic') {
+                    if (G.phase === 'el_gringo') {
+                        dispatch({
+                            type: 'TRIGGER_FLOAT',
+                            cardKey: picked.key,
+                            fromId: currentCardPickerTarget.id,
+                            toId: currentCardPicker.id,
+                        });
+
+                        // Show a quick banner so the human knows what the AI took
+                        await showBanner(
+                            `${currentCardPicker.name} picks ${CARD_DEFS[picked.key]?.name || picked.key}.`,
+                            700,
+                        );
+                    } else if (G.phase === 'panic') {
                         dispatch({
                             type: 'TRIGGER_FLOAT',
                             cardKey: picked.key,
@@ -302,9 +474,37 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         type: 'RESOLVE_CARD_PICK',
                         payload: picked,
                     });
+                    dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
                 }
             }, 1200); // Slightly longer delay than reaction to feel more "natural"
 
+            return () => clearTimeout(aiDelay);
+        }
+
+        const playerWithEmptyHand = G.players.find(
+            (p) => p.alive && p.hand.length === 0,
+        );
+        if (
+            G.phase === 'play' &&
+            playerWithEmptyHand &&
+            playerWithEmptyHand.character === 'suzy_lafayette'
+        ) {
+            const aiDelay = setTimeout(() => {
+                // Trigger your beautiful popup!
+                triggerPopup(
+                    playerWithEmptyHand.id,
+                    'ability',
+                    'play',
+                    dispatch,
+                );
+
+                dispatch({
+                    type: 'RESOLVE_CHARACTER_ABILITY',
+                    characterKey: 'suzy_lafayette',
+                    sourceId: playerWithEmptyHand.id,
+                    targetId: null,
+                });
+            }, 1000);
             return () => clearTimeout(aiDelay);
         }
     }, [
