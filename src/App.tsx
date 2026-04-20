@@ -23,6 +23,7 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { FloatAnimation } from './components/FloatLayer';
 import { BattleLogPanel } from './components/GameLogPanel';
 import PopupLayer from './components/PopupLayer';
+import { CHARACTER_DEFS } from './definitions/character';
 import { aiPickCardFrom, getAIDiscardCard } from './game/ai';
 import { getGunScore } from './game/combat';
 import { usePhaseResolver } from './game/engine';
@@ -38,6 +39,36 @@ export default function App() {
 
     const handleDraw = async () => {
         if (!G.players[G.turn].isHuman || G.phase !== 'draw') return;
+
+        const human = G.players[0];
+        const isBlackJack = human.character === 'black_jack';
+
+        if (isBlackJack && Math.random() < 0.5) {
+            triggerPopup(0, 'ability', 'play', dispatch);
+            dispatch({
+                type: 'ADD_LOG',
+                msg: `${human.name} successfully use ${CHARACTER_DEFS[human.character].name}'s ability! Draw 3 card from the deck.`,
+            });
+            await wait(1000);
+
+            dispatch({
+                type: 'TRIGGER_FLOAT',
+                cardKey: 'bang',
+                fromId: 'deck',
+                toId: 0,
+                count: 3,
+            });
+
+            await wait(500);
+
+            dispatch({
+                type: 'DRAW_CARDS_TO_START_TURN',
+                playerId: 0,
+                cardNumber: 3,
+            });
+
+            return;
+        }
 
         dispatch({
             type: 'TRIGGER_FLOAT',
@@ -252,6 +283,35 @@ export default function App() {
         if (G.phase === 'draw') {
             const drawDelay = setTimeout(async () => {
                 showBanner(`${player.name}'s turn begins…`, 800);
+
+                const isBlackJack = player.character === 'black_jack';
+
+                if (isBlackJack && Math.random() < 0.5) {
+                    triggerPopup(player.id, 'ability', 'play', dispatch);
+                    dispatch({
+                        type: 'ADD_LOG',
+                        msg: `${player.name} successfully use ${CHARACTER_DEFS[player.character].name}'s ability! Draw 3 card from the deck.`,
+                    });
+                    await wait(1000);
+
+                    dispatch({
+                        type: 'TRIGGER_FLOAT',
+                        cardKey: 'bang',
+                        fromId: 'deck',
+                        toId: player.id,
+                        count: 3,
+                    });
+
+                    await wait(500);
+
+                    dispatch({
+                        type: 'DRAW_CARDS_TO_START_TURN',
+                        playerId: player.id,
+                        cardNumber: 3,
+                    });
+
+                    return;
+                }
 
                 dispatch({
                     type: 'TRIGGER_FLOAT',

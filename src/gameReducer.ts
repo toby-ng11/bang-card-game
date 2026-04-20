@@ -55,7 +55,11 @@ type GameAction =
     | { type: 'SET_OVER'; winner: GameState['winner'] }
     | { type: 'DISCARD_TO_END_TURN'; idx: number }
     | { type: 'DISCARD_A_CARD_FROM_HAND'; playerId: number; cardKey: CardKey }
-    | { type: 'DRAW_CARDS_TO_START_TURN'; playerId: number }
+    | {
+          type: 'DRAW_CARDS_TO_START_TURN';
+          playerId: number;
+          cardNumber?: number;
+      }
     | {
           type: 'TAKE_DAMAGE';
           sourceId: number | null;
@@ -141,8 +145,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             return { ...state, floatingCard: null };
 
         case 'DRAW_CARDS_TO_START_TURN': {
-            const { playerId } = action;
-            const { cards, state: newState } = dealN(state, 2);
+            const { playerId, cardNumber } = action;
+            const { cards, state: newState } = dealN(state, cardNumber ?? 2);
+
+            const isBlackJack =
+                newState.players[playerId].character === 'black_jack';
 
             return {
                 ...newState,
@@ -154,9 +161,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 phase: 'play',
                 bangUsed: false,
                 log: [
-                    `${newState.players[playerId].name} draws 2 cards.`,
+                    isBlackJack
+                        ? `${newState.players[playerId].name} draws ${cardNumber ?? 2} cards. The second card is ${CARD_DEFS[cards[1]].name}.`
+                        : `${newState.players[playerId].name} draws ${cardNumber ?? 2} cards.`,
                     ...newState.log,
-                ].slice(0, 25),
+                ],
             };
         }
 
@@ -500,6 +509,52 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         ],
                     };
                 }
+            }
+
+            if (
+                targetPlayer.character === 'bart_cassidy' &&
+                sourceId !== null
+            ) {
+                const activateAbility: PlayerAction = {
+                    id: generateActionId('ability'),
+                    isProcessing: false,
+                    type: 'ability',
+                    sourceId: targetId,
+                    targetId: [],
+                    reactorId: [],
+                };
+
+                const newBartActions: PlayerAction = {
+                    id: generateActionId('bart_cassidy'),
+                    isProcessing: false,
+                    type: 'bart_cassidy',
+                    sourceId: targetId,
+                    targetId: [],
+                    reactorId: [targetId],
+                };
+
+                const newActions: PlayerAction[] = new Array(damageAmount).fill(
+                    newBartActions,
+                );
+
+                return {
+                    ...newState,
+                    players: updatedPlayers,
+                    pendingAction:
+                        updatedAction.reactorId.length > 0
+                            ? [
+                                  activateAbility,
+                                  ...newActions,
+                                  updatedAction,
+                                  ...otherActions,
+                              ]
+                            : [activateAbility, ...newActions, ...otherActions],
+                    phase: 'ability',
+                    log: [
+                        `${targetPlayer.name} took ${damageAmount} damage. ${targetPlayer.name} use ${CHARACTER_DEFS[targetPlayer.character].name} ability!`,
+                        ...newState.log,
+                    ],
+                };
             }
 
             return {
@@ -1339,20 +1394,38 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             const { characterKey, sourceId, targetId, damageAmount } = action;
             const character = CHARACTER_DEFS[characterKey];
             const sourcePlayer = newState.players[sourceId];
+            const [currentAction, ...otherActions] = newState.pendingAction;
 
             switch (characterKey) {
                 case 'bart_cassidy': {
+                    if (!currentAction || currentAction.type !== 'bart_cassidy')
+                        return { ...state };
+
                     const count = damageAmount ?? 1;
                     const updatedState = handleDrawEffect(
                         newState,
                         sourceId,
                         count,
                     );
+                    const updatedAction = removeReactorFromCurrentAction(
+                        currentAction,
+                        sourceId,
+                    );
 
                     return {
                         ...updatedState,
+                        pendingAction:
+                            updatedAction.reactorId.length > 0
+                                ? [updatedAction, ...otherActions]
+                                : otherActions,
+                        phase:
+                            updatedAction.reactorId.length > 0
+                                ? updatedAction.type
+                                : otherActions.length > 0
+                                  ? otherActions[0].type
+                                  : 'play',
                         log: [
-                            `${sourcePlayer.name} use ${character.name}'s ability! Draw 1 card from the deck.`,
+                            `${sourcePlayer.name} draw ${damageAmount ?? 1} card from the deck.`,
                             ...newState.log,
                         ],
                     };

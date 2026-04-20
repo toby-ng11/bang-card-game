@@ -2,7 +2,6 @@ import { CARD_DEFS } from '@/definitions/cards';
 import { GameAction } from '@/gameReducer';
 import { GameState } from '@/types';
 import { Dispatch, useEffect } from 'react';
-import { triggerPostDamageAbility } from './ability-helpers';
 import { aiPickCardFrom } from './ai';
 import { showBanner, triggerPopup, wait } from './animation';
 
@@ -17,7 +16,10 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
         if (G.phase === 'ability' && !reactor) {
             const timeDelay = setTimeout(async () => {
-                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
                 triggerPopup(
                     currentAction?.sourceId,
                     'ability',
@@ -31,7 +33,10 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
         if (G.phase === 'dying' && reactor) {
             const aiDelay = setTimeout(() => {
-                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
                 const hasBeer = reactor.hand.includes('beer');
 
                 if (hasBeer) {
@@ -58,7 +63,10 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
         if (G.phase === 'bang' && reactor) {
             const aiDelay = setTimeout(async () => {
-                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
                 // 1. ROLL ABILITY / BARREL (Check up to two times)
                 let isBlocked = false;
                 const isLuckyDuke = reactor.character === 'lucky_duke';
@@ -80,6 +88,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                 if (isBlocked) {
                     triggerPopup(reactor.id, 'barrel', 'heal', dispatch);
                     dispatch({ type: 'RESOLVE_BARREL', playerId: reactor.id });
+                    dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
                     return;
                 }
 
@@ -99,6 +108,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         sourceId: reactor.id,
                         targetId: null,
                     });
+                    dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
                     return;
                 }
                 const damageAmount = 1;
@@ -113,12 +123,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     damageAmount: damageAmount,
                 });
 
-                await triggerPostDamageAbility(
-                    dispatch,
-                    reactor,
-                    currentAction?.sourceId,
-                    damageAmount,
-                );
+                dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000);
 
             return () => clearTimeout(aiDelay);
@@ -126,7 +131,10 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
         if (G.phase === 'gatling' && reactor) {
             const aiDelay = setTimeout(async () => {
-                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
                 const sourceId = currentAction?.sourceId;
                 if (sourceId !== undefined) {
                     dispatch({
@@ -153,7 +161,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         sourceId: reactor.id,
                         targetId: null,
                     });
-
+                    dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
                     return;
                 }
 
@@ -167,12 +175,20 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                             type: 'RESOLVE_BARREL',
                             playerId: reactor.id,
                         });
+                        dispatch({
+                            type: 'RESOLVE_ACTION',
+                            id: currentAction.id,
+                        });
                         return;
                     } else if (Math.random() < chance) {
                         triggerPopup(reactor.id, 'barrel', 'heal', dispatch);
                         dispatch({
                             type: 'RESOLVE_BARREL',
                             playerId: reactor.id,
+                        });
+                        dispatch({
+                            type: 'RESOLVE_ACTION',
+                            id: currentAction.id,
                         });
                         return;
                     }
@@ -208,13 +224,6 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         targetId: reactor.id,
                         damageAmount: damageAmount,
                     });
-
-                    await triggerPostDamageAbility(
-                        dispatch,
-                        reactor,
-                        currentAction?.sourceId,
-                        damageAmount,
-                    );
                 }
                 dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000);
@@ -223,7 +232,10 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
         if (G.phase === 'indians' && reactor) {
             const aiDelay = setTimeout(async () => {
-                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
                 const sourceId = currentAction?.sourceId;
 
                 if (sourceId !== undefined) {
@@ -268,13 +280,6 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         targetId: reactor.id,
                         damageAmount: damageAmount,
                     });
-
-                    await triggerPostDamageAbility(
-                        dispatch,
-                        reactor,
-                        currentAction?.sourceId,
-                        damageAmount,
-                    );
                 }
                 dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000);
@@ -283,7 +288,10 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
 
         if (G.phase === 'duel' && reactor && !reactor.isHuman) {
             const aiDelay = setTimeout(async () => {
-                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
                 let cardToDiscard: 'bang' | 'missed' | null = null;
 
                 if (reactor.hand.includes('bang')) {
@@ -315,13 +323,6 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         targetId: reactor.id,
                         damageAmount: damageAmount,
                     });
-
-                    await triggerPostDamageAbility(
-                        dispatch,
-                        reactor,
-                        currentAction?.sourceId,
-                        damageAmount,
-                    );
                 }
                 dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000);
@@ -368,7 +369,10 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
             const availableCards = G.generalStoreCards;
             if (availableCards && availableCards.length > 0) {
                 const aiDelay = setTimeout(async () => {
-                    dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                    dispatch({
+                        type: 'SET_ACTION_PROCESSING',
+                        id: currentAction.id,
+                    });
                     // AI Logic: Priority is 'bang', otherwise take the first available card
                     const pick = availableCards.includes('bang')
                         ? 'bang'
@@ -411,7 +415,10 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
         ) {
             const cardKey = G.phase === 'el_gringo' ? null : G.phase;
             const aiDelay = setTimeout(async () => {
-                dispatch({ type: 'SET_ACTION_PROCESSING', id: currentAction.id });
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
                 const picked =
                     G.phase === 'el_gringo'
                         ? aiPickCardFrom(
@@ -479,6 +486,35 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
             }, 1200); // Slightly longer delay than reaction to feel more "natural"
 
             return () => clearTimeout(aiDelay);
+        }
+
+        if (G.phase === 'bart_cassidy' && reactor) {
+            const timeDelay = setTimeout(async () => {
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
+
+                dispatch({
+                    type: 'TRIGGER_FLOAT',
+                    cardKey: 'bang',
+                    fromId: 'deck',
+                    toId: reactor.id,
+                    count: 1,
+                });
+
+                await wait(1000);
+
+                dispatch({
+                    type: 'RESOLVE_CHARACTER_ABILITY',
+                    characterKey: 'bart_cassidy',
+                    sourceId: reactor.id,
+                    targetId: null,
+                });
+                dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
+            }, 1000);
+
+            return () => clearTimeout(timeDelay);
         }
 
         const playerWithEmptyHand = G.players.find(
