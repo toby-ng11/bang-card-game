@@ -124,13 +124,63 @@ export default function App() {
     //}, [dispatch]);
 
     const handleCardPickerPick = useCallback(
-        (picked: CardPick) => {
+        async (picked: CardPick) => {
+            if (!currentAction) return;
+            dispatch({
+                type: 'SET_ACTION_PROCESSING',
+                id: currentAction.id,
+            });
+
+            if (currentAction.type === 'jesse_jones') {
+                dispatch({
+                    type: 'TRIGGER_FLOAT',
+                    cardKey: 'ability',
+                    fromId: currentAction.targetId[0],
+                    toId: currentAction.sourceId,
+                });
+
+                await wait(1000);
+
+                dispatch({
+                    type: 'TRIGGER_FLOAT',
+                    cardKey: 'bang',
+                    fromId: 'deck',
+                    toId: currentAction.sourceId,
+                    count: 1,
+                });
+
+                await wait(1000);
+
+                dispatch({
+                    type: 'RESOLVE_CHARACTER_ABILITY',
+                    characterKey: 'jesse_jones',
+                    sourceId: currentAction.sourceId,
+                    targetId: currentAction.targetId[0],
+                    payload: { cardPick: picked },
+                });
+
+                return;
+            }
+
+            if (currentAction.type === 'el_gringo') {
+                dispatch({
+                    type: 'TRIGGER_FLOAT',
+                    cardKey: picked.key,
+                    fromId: currentAction.targetId[0],
+                    toId: human.id,
+                });
+
+                await wait(1000);
+            }
+
             dispatch({
                 type: 'RESOLVE_CARD_PICK',
                 payload: picked,
             });
+
+            dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
         },
-        [dispatch],
+        [dispatch, currentAction, human.id],
     );
 
     const handlePlayerClick = useCallback(
@@ -145,12 +195,39 @@ export default function App() {
                 alive: state.players[targetId].alive,
                 state: state,
             });
-            if (!state.targeting || state.selectedCard === null) return;
+
+            if (!state.targeting) return;
 
             const p = state.players[0];
             const target = state.players[targetId];
             if (!target.alive || target.isHuman) return;
 
+            const characterKey = p.character;
+            if (G.phase === 'draw') {
+                if (characterKey === 'jesse_jones') {
+                    if (target.hand.length > 0) {
+                        triggerPopup(p.id, 'ability', 'play', dispatch);
+
+                        await wait(1000);
+
+                        dispatch({
+                            type: 'ACTIVATE_CHARACTER_ABILITY',
+                            characterKey: characterKey,
+                            sourceId: p.id,
+                            targetId: target.id,
+                        });
+
+                        return;
+                    } else {
+                        const s = structuredClone(state);
+                        s.log = [`${target.name} has no card!`, ...s.log];
+                        dispatch({ type: 'SET_STATE', state: s });
+                        return;
+                    }
+                }
+            }
+
+            if (state.selectedCard === null) return;
             const cardKey = p.hand[state.selectedCard];
 
             // range check for range-dependent cards
@@ -214,7 +291,7 @@ export default function App() {
                 targetId: targetId,
             });
         },
-        [dispatch, human.inPlay],
+        [dispatch, G, human],
     );
 
     const handlePlayCard = useCallback(async () => {
@@ -285,6 +362,7 @@ export default function App() {
                 showBanner(`${player.name}'s turn begins…`, 800);
 
                 const isBlackJack = player.character === 'black_jack';
+                const isJesseJones = player.character === 'jesse_jones';
 
                 if (isBlackJack && Math.random() < 0.5) {
                     triggerPopup(player.id, 'ability', 'play', dispatch);
@@ -311,6 +389,74 @@ export default function App() {
                     });
 
                     return;
+                }
+
+                if (isJesseJones) {
+                    const canPickCard = (() => {
+                        const targets = G.players.filter(
+                            (q) =>
+                                q.alive &&
+                                q.id !== player.id &&
+                                q.hand.length > 0 &&
+                                isEnemy(G, player.id, q.id),
+                        );
+                        return targets.length > 0 ? targets : false;
+                    })();
+
+                    if (canPickCard) {
+                        const target =
+                            canPickCard[
+                                Math.floor(Math.random() * canPickCard.length)
+                            ];
+
+                        const picked = aiPickCardFrom(
+                            G,
+                            target,
+                            player,
+                            null,
+                            true,
+                        );
+
+                        if (picked !== null) {
+                            triggerPopup(
+                                player.id,
+                                'ability',
+                                'play',
+                                dispatch,
+                            );
+
+                            await wait(1000);
+
+                            dispatch({
+                                type: 'TRIGGER_FLOAT',
+                                cardKey: 'ability',
+                                fromId: target.id,
+                                toId: player.id,
+                            });
+
+                            await wait(1000);
+
+                            dispatch({
+                                type: 'TRIGGER_FLOAT',
+                                cardKey: 'bang',
+                                fromId: 'deck',
+                                toId: player.id,
+                                count: 1,
+                            });
+
+                            await wait(1000);
+
+                            dispatch({
+                                type: 'RESOLVE_CHARACTER_ABILITY',
+                                characterKey: 'jesse_jones',
+                                sourceId: player.id,
+                                targetId: target.id,
+                                payload: { cardPick: picked },
+                            });
+
+                            return;
+                        }
+                    }
                 }
 
                 dispatch({
@@ -548,7 +694,7 @@ export default function App() {
                     const enemies = targets.filter((q) =>
                         isEnemy(G, player.id, q.id),
                     );
-                    const pool = enemies.length ? enemies : targets;
+                    const pool = enemies.length > 0 ? enemies : targets;
 
                     const mustangBlockers = pool.filter(
                         (q) =>
@@ -781,14 +927,16 @@ export default function App() {
             <div className="pointer-events-none absolute inset-0 bg-[url('/wood-texture.png')] opacity-20 mix-blend-overlay" />
             <div className="bg-radial-gradient(circle_at_center, transparent 0%, rgba(0,0,0,0.4) 100%) absolute inset-0" />
 
-            <PopupLayer activePopups={G.activePopups} />
+            <PopupLayer activePopups={G.activePopups} dispatch={dispatch} />
 
-            {G.floatingCard && (
-                <FloatAnimation
-                    {...G.floatingCard}
-                    onComplete={() => dispatch({ type: 'CLEAR_FLOAT' })}
-                />
-            )}
+            <AnimatePresence>
+                {G.floatingCard && (
+                    <FloatAnimation
+                        {...G.floatingCard}
+                        onComplete={() => dispatch({ type: 'CLEAR_FLOAT' })}
+                    />
+                )}
+            </AnimatePresence>
 
             <header className="fixed top-0 right-0 left-0 z-30 flex items-center justify-between bg-linear-to-b from-black/60 to-transparent p-4">
                 <RoleBanner human={human} />
@@ -823,7 +971,9 @@ export default function App() {
                                 />
                             </div>
                         )}
+                    </AnimatePresence>
 
+                    <AnimatePresence>
                         {G.cardPickerPicking &&
                             G.cardPickerTarget !== null &&
                             currentAction?.reactorId[0] === human.id && (
@@ -832,29 +982,14 @@ export default function App() {
                                         target={G.players[G.cardPickerTarget]}
                                         label={G.cardPickerLabel}
                                         handOnly={
-                                            G.phase === 'el_gringo'
+                                            G.phase === 'el_gringo' ||
+                                            G.phase === 'jesse_jones'
                                                 ? true
                                                 : false
                                         }
-                                        onPick={async (picked) => {
-                                            if (
-                                                currentAction.type ===
-                                                'el_gringo'
-                                            ) {
-                                                dispatch({
-                                                    type: 'TRIGGER_FLOAT',
-                                                    cardKey: picked.key,
-                                                    fromId: currentAction
-                                                        .targetId[0],
-                                                    toId: human.id,
-                                                });
-
-                                                await wait(1000);
-                                                handleCardPickerPick(picked);
-                                            } else {
-                                                handleCardPickerPick(picked);
-                                            }
-                                        }}
+                                        onPick={(picked) =>
+                                            handleCardPickerPick(picked)
+                                        }
                                     />
                                 </div>
                             )}
@@ -864,7 +999,7 @@ export default function App() {
 
             <BattleLogPanel log={G.log} />
 
-            <footer className="fixed right-0 bottom-0 left-0 z-30 bg-linear-to-t from-black/90 via-black/60 to-transparent px-8 pt-20 pb-6">
+            <footer className="fixed right-0 bottom-0 left-0 z-30 bg-linear-to-t from-black/90 via-black/60 to-transparent p-6">
                 <div className="mx-auto flex max-w-7xl items-end gap-10">
                     {/* Action Buttons Column */}
                     <div className="mb-2 flex min-w-55 flex-col gap-3 border-r border-amber-900/30 pr-10">
@@ -925,7 +1060,7 @@ export default function App() {
                     </div>
 
                     {/* Hand Container */}
-                    <div className="group relative flex-1">
+                    <div className="group relative max-h-40 flex-1">
                         <div className="absolute -top-6 left-4 rounded-t-lg border-x border-t border-amber-700/50 bg-amber-900/80 px-3 py-1">
                             <span className="text-[10px] font-bold tracking-widest text-amber-200 uppercase">
                                 Your Hand — {human.hand.length} Cards
@@ -937,6 +1072,16 @@ export default function App() {
                                 currentLP={human.hp}
                                 selectedCard={G.selectedCard}
                                 discardingToEndTurn={G.discardingToEndTurn}
+                                bangUsed={G.bangUsed}
+                                hasVolcanic={G.players[0].inPlay.includes(
+                                    'volcanic',
+                                )}
+                                isHumanTurn={G.turn === 0}
+                                isHumanTurnToReact={
+                                    currentAction
+                                        ? currentAction.reactorId[0] === 0
+                                        : false
+                                }
                                 onCardClick={handleCardClick}
                             />
                         </div>

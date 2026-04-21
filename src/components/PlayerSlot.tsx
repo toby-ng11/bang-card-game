@@ -2,7 +2,7 @@ import { CARD_DEFS } from '@/definitions/cards';
 import { CHARACTER_DEFS } from '@/definitions/character';
 import { distance, inRange } from '@/game/helpers';
 import { cn } from '@/lib/utils';
-import { CardKey, Player, Role } from '@/types';
+import { CardKey, Phase, Player, Role } from '@/types';
 import { cva } from 'class-variance-authority';
 import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 interface PlayerSlotProps {
     p: Player;
     human: Player;
+    phase: Phase;
     players: Player[];
     turn: number;
     targeting: boolean;
@@ -32,6 +33,7 @@ const roleVariants = cva('text-[10px] font-medium px-[7px] py-[2px] ml-1', {
 export default function PlayerSlot({
     p,
     human,
+    phase,
     players,
     turn,
     targeting,
@@ -39,18 +41,35 @@ export default function PlayerSlot({
     flashClass,
     onPlayerClick,
 }: PlayerSlotProps) {
-    const canTargetAllPlayers =
-        selectedCard !== null &&
-        ['catbalou', 'duel'].includes(human.hand[selectedCard]);
+    const isGlobalTargetingCard = (cardKey: string) =>
+        ['catbalou', 'duel'].includes(cardKey);
 
-    const isClickTarget =
-        selectedCard !== null &&
-        targeting &&
-        !p.isHuman &&
-        p.alive &&
-        (canTargetAllPlayers
-            ? true
-            : inRange(players, human.id, p.id, human.hand[selectedCard]));
+    const isJesseJonesSteal = (phase: string, character: string) =>
+        phase === 'draw' && character === 'jesse_jones';
+
+    const selectedCardKey =
+        selectedCard !== null ? human.hand[selectedCard] : null;
+
+    const canTargetAllPlayers =
+        (selectedCardKey && isGlobalTargetingCard(selectedCardKey)) ||
+        isJesseJonesSteal(phase, human.character);
+
+    const isClickTarget = (() => {
+    // Basic requirements: Must be targeting, a non-human, and alive
+    if (!targeting || p.isHuman || !p.alive) return false;
+
+    // Phase-specific targeting logic
+    if (phase === 'draw') {
+        return isJesseJonesSteal(phase, human.character);
+    }
+
+    // Card-specific targeting logic
+    if (selectedCard !== null && selectedCardKey) {
+        return canTargetAllPlayers || inRange(players, human.id, p.id, selectedCardKey);
+    }
+
+    return false;
+})();
 
     const isCur = p.id === turn;
     const showRole = p.role === 'SHERIFF' || !p.alive || p.isHuman;

@@ -94,12 +94,12 @@ export default function GeneralStorePicker({
     };
 
     return (
-        <AnimatePresence>
+        <>
             {originalCardsRef.current.length > 0 && (
                 <motion.div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
-                    initial="hidden"
-                    animate="visible"
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
                     exit={{ opacity: 0 }}
                     variants={overlayVariants}
                 >
@@ -252,6 +252,6 @@ export default function GeneralStorePicker({
                     </motion.div>
                 </motion.div>
             )}
-        </AnimatePresence>
+        </>
     );
 }

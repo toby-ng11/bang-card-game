@@ -33,6 +33,7 @@ export default function GameTable({
                             <PlayerSlot
                                 p={p}
                                 human={human}
+                                phase={G.phase}
                                 players={G.players}
                                 turn={G.turn}
                                 targeting={G.targeting}

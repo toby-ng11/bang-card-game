@@ -19,11 +19,6 @@ const triggerPopup = (
 ) => {
     const id = `popup-${pid}-${Date.now()}`;
     dispatch({ type: 'ADD_POPUP', payload: { id, pid, cardKey, type } });
-
-    // Auto-remove after animation finishes
-    setTimeout(() => {
-        dispatch({ type: 'REMOVE_POPUP', id });
-    }, 1500);
 };
 
 const wait = (ms: number): Promise<void> => {

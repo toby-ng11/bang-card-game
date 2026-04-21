@@ -10,6 +10,10 @@ interface PlayerHandProps {
     currentLP: number;
     selectedCard: number | null;
     discardingToEndTurn: boolean;
+    bangUsed: boolean;
+    hasVolcanic: boolean;
+    isHumanTurn: boolean;
+    isHumanTurnToReact: boolean;
     onCardClick: (idx: number) => void;
 }
 
@@ -18,8 +22,15 @@ export default function PlayerHand({
     currentLP,
     selectedCard,
     discardingToEndTurn,
+    bangUsed,
+    hasVolcanic,
+    isHumanTurn,
+    isHumanTurnToReact,
     onCardClick,
 }: PlayerHandProps) {
+    const handleReturn = () => {
+        return;
+    };
     return (
         <div className="relative w-full min-w-0 px-4">
             <div className="absolute -top-12 left-1/2 w-full -translate-x-1/2 text-center">
@@ -66,7 +77,12 @@ export default function PlayerHand({
                                             'border-amber-800 bg-linear-to-br from-amber-100 to-amber-200 text-amber-950',
                                         c.color === 'blue' &&
                                             'border-blue-800 bg-linear-to-br from-blue-100 to-blue-200 text-blue-950',
-
+                                        cardKey === 'bang' &&
+                                            bangUsed &&
+                                            isHumanTurn &&
+                                            !hasVolcanic &&
+                                            !discardingToEndTurn &&
+                                            'cursor-not-allowed opacity-60',
                                         // Selection / Discard States
                                         isSel &&
                                             'z-40 -translate-y-6 border-yellow-500 ring-4 shadow-yellow-500/50 ring-yellow-400',
@@ -76,7 +92,14 @@ export default function PlayerHand({
                                             !discardingToEndTurn &&
                                             'hover:border-white',
                                     )}
-                                    onClick={() => onCardClick(i)}
+                                    onClick={() =>
+                                        cardKey === 'bang' &&
+                                        bangUsed &&
+                                        !hasVolcanic &&
+                                        !discardingToEndTurn
+                                            ? handleReturn
+                                            : onCardClick(i)
+                                    }
                                 >
                                     {/* Card Content */}
                                     <div className="flex w-full items-start justify-between text-[10px] font-black sm:text-xs">

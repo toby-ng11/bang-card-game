@@ -36,6 +36,7 @@ export const BattleLogPanel = memo(({ log }: { log: string[] }) => {
 
             {/* Toggle tab */}
             <button
+                type="button"
                 onClick={() => setIsOpen((prev) => !prev)}
                 className="group flex h-24 w-6 cursor-pointer items-center justify-center rounded-r-xl border-y border-r border-amber-900/40 bg-[#2a1810] text-amber-500 transition-all hover:w-8 hover:bg-[#3d2317]"
             >

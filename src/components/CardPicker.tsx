@@ -2,7 +2,7 @@ import { CARD_DEFS } from '@/definitions/cards';
 import { shuffle } from '@/game/helpers';
 import { cn } from '@/lib/utils';
 import { CardPick, CardPickSource, Player } from '@/types';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 import { Badge } from './ui/badge';
 import { Card } from './ui/card';
 
@@ -49,6 +49,7 @@ export default function CardPicker({
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
                 className="w-full max-w-2xl overflow-hidden rounded-xl border-2 border-amber-600/50 bg-slate-900 shadow-2xl"
             >
                 {/* Header */}
@@ -60,58 +61,56 @@ export default function CardPicker({
 
                 <div className="p-6">
                     <div className="flex flex-wrap items-center justify-center gap-4">
-                        <AnimatePresence>
-                            {allCards.map((pick) => {
-                                const { source, idx, key } = pick;
-                                const c = CARD_DEFS[key];
-                                const isInPlay = source === 'inPlay';
+                        {allCards.map((pick) => {
+                            const { source, idx, key } = pick;
+                            const c = CARD_DEFS[key];
+                            const isInPlay = source === 'inPlay';
 
-                                return (
-                                    <motion.div
-                                        key={`${source}-${idx}`}
-                                        whileHover={{ y: -5, scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() => onPick(pick)}
+                            return (
+                                <motion.div
+                                    key={`${source}-${idx}`}
+                                    whileHover={{ y: -5, scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => onPick(pick)}
+                                >
+                                    <Card
+                                        className={cn(
+                                            'relative flex aspect-2/3 w-30 cursor-pointer flex-col items-center justify-center overflow-hidden border-2 p-2 text-center transition-colors select-none',
+                                            isInPlay
+                                                ? 'border-blue-400 bg-white text-slate-900'
+                                                : 'border-amber-500 bg-linear-to-br from-red-800 to-red-950 text-white',
+                                        )}
                                     >
-                                        <Card
-                                            className={cn(
-                                                'relative flex aspect-2/3 w-30 cursor-pointer flex-col items-center justify-center overflow-hidden border-2 p-2 text-center transition-colors select-none',
-                                                isInPlay
-                                                    ? 'border-blue-400 bg-white text-slate-900'
-                                                    : 'border-amber-500 bg-linear-to-br from-red-800 to-red-950 text-white',
-                                            )}
-                                        >
-                                            {isInPlay ? (
-                                                <>
-                                                    <span className="mb-1 text-2xl">
-                                                        {c?.icon}
-                                                    </span>
-                                                    <span className="text-[10px] leading-tight font-bold uppercase">
-                                                        {c?.name}
-                                                    </span>
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className="absolute -bottom-1 h-4 border-blue-200 bg-blue-100 px-1 text-[8px] text-blue-700"
-                                                    >
-                                                        IN PLAY
-                                                    </Badge>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <div className="absolute inset-1 rounded-sm border border-amber-500/30" />
-                                                    <span className="rotate-12 text-4xl opacity-20">
-                                                        🤠
-                                                    </span>
-                                                    <span className="font-serif text-[10px] tracking-tighter opacity-80">
-                                                        BANG!
-                                                    </span>
-                                                </>
-                                            )}
-                                        </Card>
-                                    </motion.div>
-                                );
-                            })}
-                        </AnimatePresence>
+                                        {isInPlay ? (
+                                            <>
+                                                <span className="mb-1 text-2xl">
+                                                    {c?.icon}
+                                                </span>
+                                                <span className="text-[10px] leading-tight font-bold uppercase">
+                                                    {c?.name}
+                                                </span>
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="absolute -bottom-1 h-4 border-blue-200 bg-blue-100 px-1 text-[8px] text-blue-700"
+                                                >
+                                                    IN PLAY
+                                                </Badge>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="absolute inset-1 rounded-sm border border-amber-500/30" />
+                                                <span className="rotate-12 text-4xl opacity-20">
+                                                    🤠
+                                                </span>
+                                                <span className="font-serif text-[10px] tracking-tighter opacity-80">
+                                                    BANG!
+                                                </span>
+                                            </>
+                                        )}
+                                    </Card>
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 </div>
 

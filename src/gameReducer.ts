@@ -86,7 +86,16 @@ type GameAction =
           characterKey: CharacterKey;
           sourceId: number;
           targetId: number | null;
-          damageAmount?: number;
+          payload?: {
+              damageAmount?: number;
+              cardPick?: CardPick;
+          };
+      }
+    | {
+          type: 'ACTIVATE_CHARACTER_ABILITY';
+          characterKey: CharacterKey;
+          sourceId: number;
+          targetId: number | null;
       }
     | { type: 'END_TURN'; playerId: number }
     | { type: 'CANCEL_END_TURN'; playerId: number };
@@ -109,23 +118,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             };
 
         case 'REMOVE_POPUP': {
-            const newState = structuredClone(state);
-            const [currentAction, ...otherActions] = newState.pendingAction;
+            const [currentAction, ...otherActions] = state.pendingAction;
 
             if (currentAction?.type !== 'ability')
                 return {
-                    ...newState,
-                    activePopups: newState.activePopups.filter(
+                    ...state,
+                    activePopups: state.activePopups.filter(
                         (p) => p.id !== action.id,
                     ),
                 };
 
             return {
-                ...newState,
+                ...state,
                 pendingAction: [...otherActions],
                 phase:
                     otherActions.length === 0 ? 'play' : otherActions[0].type,
-                activePopups: newState.activePopups.filter(
+                activePopups: state.activePopups.filter(
                     (p) => p.id !== action.id,
                 ),
             };
@@ -160,6 +168,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 ),
                 phase: 'play',
                 bangUsed: false,
+                targeting: false,
                 log: [
                     isBlackJack
                         ? `${newState.players[playerId].name} draws ${cardNumber ?? 2} cards. The second card is ${CARD_DEFS[cards[1]].name}.`
@@ -1391,7 +1400,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
         case 'RESOLVE_CHARACTER_ABILITY': {
             const newState = structuredClone(state);
-            const { characterKey, sourceId, targetId, damageAmount } = action;
+            const { characterKey, sourceId, targetId, payload } = action;
             const character = CHARACTER_DEFS[characterKey];
             const sourcePlayer = newState.players[sourceId];
             const [currentAction, ...otherActions] = newState.pendingAction;
@@ -1401,7 +1410,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     if (!currentAction || currentAction.type !== 'bart_cassidy')
                         return { ...state };
 
-                    const count = damageAmount ?? 1;
+                    const count = payload?.damageAmount ?? 1;
                     const updatedState = handleDrawEffect(
                         newState,
                         sourceId,
@@ -1425,7 +1434,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                                   ? otherActions[0].type
                                   : 'play',
                         log: [
-                            `${sourcePlayer.name} draw ${damageAmount ?? 1} card from the deck.`,
+                            `${sourcePlayer.name} draw ${payload?.damageAmount ?? 1} card from the deck.`,
                             ...newState.log,
                         ],
                     };
@@ -1440,12 +1449,75 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     return state;
                 }
                 case 'jesse_jones': {
-                    return state;
+                    const cardPick = payload?.cardPick;
+                    if (targetId === null || !cardPick) return { ...newState };
+
+                    const { source, idx, key } = cardPick;
+                    if (source !== 'hand')
+                        return {
+                            ...newState,
+                            log: [
+                                'You must pick a card in hand!',
+                                ...newState.log,
+                            ],
+                        };
+
+                    const sourcePlayer = newState.players[sourceId];
+                    const targetPlayer = newState.players[targetId];
+
+                    let updatedPlayers = newState.players.map((p) => {
+                        if (p.id === targetId) {
+                            const newHand = [...p.hand];
+                            newHand.splice(idx, 1);
+                            return { ...p, hand: newHand };
+                        }
+                        return p;
+                    });
+
+                    updatedPlayers = updatedPlayers.map((p) => {
+                        if (p.id === sourceId) {
+                            return { ...p, hand: [...p.hand, key] };
+                        }
+                        return p;
+                    });
+
+                    const { cards, state: stateAfterDraw } = dealN(newState, 1);
+                    updatedPlayers = updatedPlayers.map((p) => {
+                        if (p.id === sourceId) {
+                            return { ...p, hand: [...p.hand, ...cards] };
+                        }
+                        return p;
+                    });
+
+                    const updatedAction = removeReactorFromCurrentAction(
+                        currentAction,
+                        sourceId,
+                    );
+
+                    return {
+                        ...stateAfterDraw,
+                        players: updatedPlayers,
+                        bangUsed: false,
+                        phase:
+                            updatedAction.reactorId.length > 0
+                                ? updatedAction.type
+                                : otherActions.length > 0
+                                  ? otherActions[0].type
+                                  : 'play',
+                        cardPickerPicking: false,
+                        cardPickerTarget: null,
+                        pendingAction:
+                            updatedAction.reactorId.length > 0
+                                ? [updatedAction, ...otherActions]
+                                : otherActions,
+                        log: [
+                            `${sourcePlayer.name} stole a card from ${targetPlayer.name} and draw 1 card from the deck.`,
+                            ...newState.log,
+                        ],
+                    };
                 }
                 case 'jourdonnas': {
-                    const newState = structuredClone(state);
-                    const [currentAction, ...otherActions] =
-                        newState.pendingAction;
+                    // same as barrel
                     if (
                         currentAction?.type !== 'bang' &&
                         currentAction?.type !== 'gatling'
@@ -1469,6 +1541,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                                 : otherActions.length > 0
                                   ? otherActions[0].type
                                   : 'play',
+
                         log: [
                             `${newState.players[sourceId].name} successfully use ${character.name}'s ability and dodge a BANG!.`,
                             ...newState.log,
@@ -1516,6 +1589,52 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                 case 'willy_the_kid':
                 default:
                     return state;
+            }
+        }
+
+        case 'ACTIVATE_CHARACTER_ABILITY': {
+            const newState = structuredClone(state);
+            const { characterKey, sourceId, targetId } = action;
+            const character = CHARACTER_DEFS[characterKey];
+            const sourcePlayer = newState.players[sourceId];
+            //const [currentAction, ...otherActions] = newState.pendingAction;
+
+            switch (characterKey) {
+                case 'jesse_jones': {
+                    if (
+                        !newState.targeting ||
+                        targetId === null ||
+                        newState.phase !== 'draw'
+                    )
+                        return { ...newState };
+
+                    const targetPlayer = newState.players[targetId];
+                    const newAction: PlayerAction = {
+                        id: generateActionId(characterKey),
+                        isProcessing: false,
+                        type: characterKey,
+                        sourceId: sourceId,
+                        targetId: [targetId],
+                        reactorId: [sourceId],
+                    };
+
+                    return {
+                        ...newState,
+                        targeting: false,
+                        phase: characterKey,
+                        cardPickerPicking: true,
+                        cardPickerTarget: targetId,
+                        cardPickerLabel: `Steal a card from ${targetPlayer.name}`,
+                        pendingAction: [newAction],
+                        log: [
+                            `${sourcePlayer.name} use ${character.name}'s ability! Steal a card from ${targetPlayer.name}'s hand.`,
+
+                            ...newState.log,
+                        ],
+                    };
+                }
+                default:
+                    return { ...state };
             }
         }
     }
@@ -1676,10 +1795,9 @@ function handleDrawEffect(state: GameState, sourceId: number, count: number) {
     return originalState;
 }
 
-let actionCounter = 0;
 const generateActionId = (type: string): string => {
     // Example: "bang-12-1713567890"
-    return `${type}-${actionCounter++}-${Date.now()}`;
+    return `${type}-${crypto.randomUUID()}`;
 };
 
 export { GameAction, gameReducer };

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 export default function GameLog({ log }: { log: string[] }) {
     return (
         <div className="scrollbar-thin scrollbar-thumb-amber-900/40 scrollbar-track-transparent flex h-full flex-col gap-2 overflow-y-auto pr-2">
-            <AnimatePresence initial={false}>
+            <AnimatePresence>
                 {log.map((entry) => {
                     // Logic to detect entry type for styling
                     const isDamage =
@@ -20,6 +20,8 @@ export default function GameLog({ log }: { log: string[] }) {
 
                     return (
                         <motion.div
+                            //initial={{ x: -50, opacity: 0 }}
+                            //animate={{ x: 0, opacity: 1 }}
                             key={`${entry}-${crypto.randomUUID()}`}
                             className={cn(
                                 'rounded-lg border-l-2 border-amber-700/30 bg-white/5 p-2 text-xs leading-relaxed text-stone-300 transition-colors',

@@ -7,6 +7,33 @@ import { showBanner, triggerPopup, wait } from './animation';
 
 const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
     return useEffect(() => {
+        const playerWithEmptyHand = G.players.find(
+            (p) => p.alive && p.hand.length === 0,
+        );
+        if (
+            G.phase === 'play' &&
+            playerWithEmptyHand &&
+            playerWithEmptyHand.character === 'suzy_lafayette'
+        ) {
+            const aiDelay = setTimeout(() => {
+                // Trigger your beautiful popup!
+                triggerPopup(
+                    playerWithEmptyHand.id,
+                    'ability',
+                    'play',
+                    dispatch,
+                );
+
+                dispatch({
+                    type: 'RESOLVE_CHARACTER_ABILITY',
+                    characterKey: 'suzy_lafayette',
+                    sourceId: playerWithEmptyHand.id,
+                    targetId: null,
+                });
+            }, 1000);
+            return () => clearTimeout(aiDelay);
+        }
+
         const [currentAction] = G.pendingAction;
         if (!currentAction || currentAction.isProcessing) return;
 
@@ -390,7 +417,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         700,
                     );
                     dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
-                }, 1200); // Slightly longer delay than reaction to feel more "natural"
+                }, 1100); // Slightly longer delay than reaction to feel more "natural"
 
                 return () => clearTimeout(aiDelay);
             }
@@ -515,33 +542,6 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
             }, 1000);
 
             return () => clearTimeout(timeDelay);
-        }
-
-        const playerWithEmptyHand = G.players.find(
-            (p) => p.alive && p.hand.length === 0,
-        );
-        if (
-            G.phase === 'play' &&
-            playerWithEmptyHand &&
-            playerWithEmptyHand.character === 'suzy_lafayette'
-        ) {
-            const aiDelay = setTimeout(() => {
-                // Trigger your beautiful popup!
-                triggerPopup(
-                    playerWithEmptyHand.id,
-                    'ability',
-                    'play',
-                    dispatch,
-                );
-
-                dispatch({
-                    type: 'RESOLVE_CHARACTER_ABILITY',
-                    characterKey: 'suzy_lafayette',
-                    sourceId: playerWithEmptyHand.id,
-                    targetId: null,
-                });
-            }, 1000);
-            return () => clearTimeout(aiDelay);
         }
     }, [
         G,
