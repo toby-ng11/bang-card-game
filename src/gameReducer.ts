@@ -885,6 +885,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
             if (!sourcePlayer.hand.includes(cardKey)) return newState;
             const cardColor = CARD_DEFS[cardKey].color;
+            newState.selectedCard = null;
             switch (cardColor) {
                 case 'brown': {
                     const newPlayerState = removeCardFromHand(
@@ -1601,12 +1602,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
             switch (characterKey) {
                 case 'jesse_jones': {
-                    if (
-                        !newState.targeting ||
-                        targetId === null ||
-                        newState.phase !== 'draw'
-                    )
-                        return { ...newState };
+                    if (targetId === null || newState.phase !== 'draw')
+                        return { ...state };
+
+                    if (sourceId === 0 && !newState.targeting)
+                        return { ...state };
 
                     const targetPlayer = newState.players[targetId];
                     const newAction: PlayerAction = {

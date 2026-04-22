@@ -95,7 +95,6 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     id: currentAction.id,
                 });
                 // 1. ROLL ABILITY / BARREL (Check up to two times)
-                let isBlocked = false;
                 const isLuckyDuke = reactor.character === 'lucky_duke';
 
                 // Roll 1: If Jourdonnais, check Ability
@@ -103,16 +102,21 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     reactor.character === 'jourdonnas' &&
                     Math.random() < 0.25
                 ) {
-                    isBlocked = true;
+                    triggerPopup(reactor.id, 'ability', 'play', dispatch);
+                    dispatch({
+                        type: 'RESOLVE_CHARACTER_ABILITY',
+                        characterKey: 'jourdonnas',
+                        sourceId: reactor.id,
+                        targetId: null,
+                    });
+                    dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
+                    return;
                 }
                 // Roll 2: If Barrel in play, check Barrel
-                else if (
+                if (
                     reactor.inPlay.includes('barrel') &&
                     Math.random() < (isLuckyDuke ? 0.4375 : 0.25)
                 ) {
-                    isBlocked = true;
-                }
-                if (isBlocked) {
                     triggerPopup(reactor.id, 'barrel', 'heal', dispatch);
                     dispatch({ type: 'RESOLVE_BARREL', playerId: reactor.id });
                     dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
@@ -151,7 +155,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                 });
 
                 dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
-            }, 1000);
+            }, 500);
 
             return () => clearTimeout(aiDelay);
         }
@@ -253,7 +257,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     });
                 }
                 dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
-            }, 1000);
+            }, 500);
             return () => clearTimeout(aiDelay);
         }
 
@@ -309,7 +313,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     });
                 }
                 dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
-            }, 1000);
+            }, 500);
             return () => clearTimeout(aiDelay);
         }
 
@@ -538,6 +542,61 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     sourceId: reactor.id,
                     targetId: null,
                 });
+                dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
+            }, 1000);
+
+            return () => clearTimeout(timeDelay);
+        }
+
+        if (
+            G.phase === 'jesse_jones' &&
+            reactor &&
+            !reactor.isHuman &&
+            currentCardPicker &&
+            !currentCardPicker.isHuman &&
+            currentCardPickerTarget
+        ) {
+            const timeDelay = setTimeout(async () => {
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
+
+                const picked = aiPickCardFrom(
+                    G,
+                    currentCardPickerTarget,
+                    currentCardPicker,
+                    null,
+                    true,
+                );
+                if (picked !== null) {
+                    dispatch({
+                        type: 'TRIGGER_FLOAT',
+                        cardKey: 'ability',
+                        fromId: currentCardPickerTarget.id,
+                        toId: currentCardPicker.id,
+                    });
+
+                    await wait(300);
+
+                    dispatch({
+                        type: 'TRIGGER_FLOAT',
+                        cardKey: 'bang',
+                        fromId: 'deck',
+                        toId: currentCardPicker.id,
+                        count: 1,
+                    });
+
+                    await wait(1000);
+
+                    dispatch({
+                        type: 'RESOLVE_CHARACTER_ABILITY',
+                        characterKey: 'jesse_jones',
+                        sourceId: currentCardPicker.id,
+                        targetId: currentCardPickerTarget.id,
+                        payload: { cardPick: picked },
+                    });
+                }
                 dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000);
 

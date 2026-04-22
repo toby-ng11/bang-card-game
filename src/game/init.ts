@@ -52,7 +52,7 @@ function initGame(): GameState {
     // for testing
     const players: Player[] = roles.map((role, i) => {
         const isHuman = i === 0;
-        const characterKey = i === 0 ? 'jesse_jones' : charPool.pop()!;
+        const characterKey = charPool.pop()!;
         const charInfo = CHARACTER_DEFS[characterKey];
 
         const hpBonus = role === 'SHERIFF' ? 1 : 0;

@@ -32,7 +32,7 @@ export default function PlayerHand({
         return;
     };
     return (
-        <div className="relative w-full min-w-0 px-4">
+        <div className="relative min-w-0 px-4">
             <div className="absolute -top-12 left-1/2 w-full -translate-x-1/2 text-center">
                 <AnimatePresence mode="wait">
                     {discardingToEndTurn ? (
@@ -55,7 +55,7 @@ export default function PlayerHand({
                 </AnimatePresence>
             </div>
 
-            <div className="mx-auto flex min-h-10 w-full max-w-6xl flex-row flex-nowrap items-end justify-center gap-1 overflow-visible sm:gap-2">
+            <div className="flex flex-row gap-2">
                 {hand.map((cardKey, i) => {
                     const c = CARD_DEFS[cardKey];
                     if (!c) return null;
@@ -68,9 +68,7 @@ export default function PlayerHand({
                                     whileHover={{ y: -20, zIndex: 50 }}
                                     className={cn(
                                         // Base Styles: Fixed height, flexible width with min/max constraints
-                                        'relative flex shrink cursor-pointer flex-col items-center justify-between rounded-xl p-2 select-none',
-                                        'aspect-2/3 w-full max-w-30 min-w-0',
-                                        'border-2 shadow-2xl',
+                                        '@container relative flex aspect-2/3 w-full max-w-30 min-w-0 shrink cursor-pointer flex-col items-center justify-between rounded-xl border-2 p-2 shadow-2xl select-none',
 
                                         // Color Themes
                                         c.color === 'brown' &&
@@ -102,7 +100,7 @@ export default function PlayerHand({
                                     }
                                 >
                                     {/* Card Content */}
-                                    <div className="flex w-full items-start justify-between text-[10px] font-black sm:text-xs">
+                                    <div className="flex w-full items-start justify-between font-roboto text-[15cqi] font-black font-stretch-50%">
                                         <span className="pr-1 leading-none wrap-break-word uppercase">
                                             {c.name}
                                         </span>
@@ -117,17 +115,14 @@ export default function PlayerHand({
                                         </span>
                                     </div>
 
-                                    <div className="my-auto flex flex-col gap-2 text-3xl drop-shadow-sm filter sm:text-4xl">
+                                    <div className="my-auto flex flex-col items-center gap-2 text-[40cqi] drop-shadow-sm filter">
                                         {/* Main Card Icon (e.g., the Gun or the Hand) */}
                                         {c.icon}
 
                                         {/* Range Indicator - only shows if c.range exists */}
                                         {c.range && (
-                                            <div className="flex items-center justify-center gap-1 text-xl opacity-90 sm:text-2xl">
-                                                <Crosshair
-                                                    size={24}
-                                                    className="inline-block"
-                                                />
+                                            <div className="flex items-center justify-center gap-1 opacity-90">
+                                                <Crosshair className="inline-block" />
                                                 <span className="font-bold">
                                                     {c.range}
                                                 </span>

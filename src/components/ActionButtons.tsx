@@ -1,7 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { CardKey, GameState, Player } from '@/types';
 import { HeartCrack, Swords, Zap } from 'lucide-react';
+import { CancelDiscardButton } from './command-buttons/cancel-discard-button';
 import { DrawCardsToStartTurnButton } from './command-buttons/draw-cards-to-start-turn-button';
+import { EndTurnButton } from './command-buttons/end-turn-button';
 import { UseJesseJonesAbilityButton } from './command-buttons/use-jesse-jones-ability-button';
 
 interface ActionButtonsProps {
@@ -76,9 +78,7 @@ export default function ActionButtons({
                             Cancel
                         </Button>
                     )}
-                    {!G.targeting && (
-                        <Button onClick={onEndTurn}>End Turn</Button>
-                    )}
+                    {!G.targeting && <EndTurnButton onEndTurn={onEndTurn} />}
                 </>
             )}
             {G.phase === 'duel' && currentAction.reactorId[0] === human.id && (
@@ -151,7 +151,7 @@ export default function ActionButtons({
                 </div>
             )}
             {G.discardingToEndTurn && (
-                <Button onClick={onCancelEndTurn}>Cancel Discard</Button>
+                <CancelDiscardButton onCancelEndTurn={onCancelEndTurn} />
             )}
             {}
             {/* AI turn */}

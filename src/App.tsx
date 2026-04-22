@@ -139,7 +139,7 @@ export default function App() {
                     toId: currentAction.sourceId,
                 });
 
-                await wait(1000);
+                await wait(300);
 
                 dispatch({
                     type: 'TRIGGER_FLOAT',
@@ -428,30 +428,10 @@ export default function App() {
                             await wait(1000);
 
                             dispatch({
-                                type: 'TRIGGER_FLOAT',
-                                cardKey: 'ability',
-                                fromId: target.id,
-                                toId: player.id,
-                            });
-
-                            await wait(1000);
-
-                            dispatch({
-                                type: 'TRIGGER_FLOAT',
-                                cardKey: 'bang',
-                                fromId: 'deck',
-                                toId: player.id,
-                                count: 1,
-                            });
-
-                            await wait(1000);
-
-                            dispatch({
-                                type: 'RESOLVE_CHARACTER_ABILITY',
+                                type: 'ACTIVATE_CHARACTER_ABILITY',
                                 characterKey: 'jesse_jones',
                                 sourceId: player.id,
                                 targetId: target.id,
-                                payload: { cardPick: picked },
                             });
 
                             return;
@@ -932,6 +912,7 @@ export default function App() {
             <AnimatePresence>
                 {G.floatingCard && (
                     <FloatAnimation
+                        key={`${G.floatingCard.cardKey}-${G.floatingCard.fromId}-${G.floatingCard.toId}`}
                         {...G.floatingCard}
                         onComplete={() => dispatch({ type: 'CLEAR_FLOAT' })}
                     />
@@ -1000,9 +981,9 @@ export default function App() {
             <BattleLogPanel log={G.log} />
 
             <footer className="fixed right-0 bottom-0 left-0 z-30 bg-linear-to-t from-black/90 via-black/60 to-transparent p-6">
-                <div className="mx-auto flex max-w-7xl items-end gap-10">
+                <div className="flex items-end gap-10">
                     {/* Action Buttons Column */}
-                    <div className="mb-2 flex min-w-55 flex-col gap-3 border-r border-amber-900/30 pr-10">
+                    <div className="mb-2 flex min-w-65 flex-col gap-3 border-r border-amber-900/30 pr-10">
                         <div className="px-2">
                             <h3 className="text-[10px] font-bold tracking-[0.2em] text-amber-500 uppercase opacity-60">
                                 Player Commands
@@ -1060,7 +1041,7 @@ export default function App() {
                     </div>
 
                     {/* Hand Container */}
-                    <div className="group relative max-h-40 flex-1">
+                    <div className="group relative max-h-40 grow">
                         <div className="absolute -top-6 left-4 rounded-t-lg border-x border-t border-amber-700/50 bg-amber-900/80 px-3 py-1">
                             <span className="text-[10px] font-bold tracking-widest text-amber-200 uppercase">
                                 Your Hand — {human.hand.length} Cards
