@@ -6,8 +6,8 @@ import { CancelAiblityButton } from './command-buttons/cancel-ability-button';
 import { CancelDiscardButton } from './command-buttons/cancel-discard-button';
 import { DrawCardsToStartTurnButton } from './command-buttons/draw-cards-to-start-turn-button';
 import { EndTurnButton } from './command-buttons/end-turn-button';
+import { UseCharacterAbilityButton } from './command-buttons/use-character-ability-button';
 import { UseJesseJonesAbilityButton } from './command-buttons/use-jesse-jones-ability-button';
-import { UseSidKetchumAbilityButton } from './command-buttons/use-sid-ketchum-ability-button';
 
 interface ActionButtonsProps {
     G: GameState;
@@ -61,6 +61,15 @@ export default function ActionButtons({
                             onTargetPlayer={onTargetPlayer}
                         />
                     )}
+                    {human.character === 'pedro_ramirez' &&
+                        G.discardPile.length > 0 && (
+                            <UseCharacterAbilityButton
+                                character={human.character}
+                                onActiveAbility={() =>
+                                    onActiveAbility(human.character)
+                                }
+                            />
+                        )}
                     <DrawCardsToStartTurnButton onDraw={onDraw} />
                 </>
             )}
@@ -73,7 +82,8 @@ export default function ActionButtons({
             {isMyTurn && G.phase === 'play' && !G.discardingToEndTurn && (
                 <>
                     {human.character === 'sid_ketchum' && (
-                        <UseSidKetchumAbilityButton
+                        <UseCharacterAbilityButton
+                            character={human.character}
                             onActiveAbility={() =>
                                 onActiveAbility(human.character)
                             }

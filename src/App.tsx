@@ -9,7 +9,12 @@ import RoleBanner from '@/components/RoleBanner';
 import { Toaster } from '@/components/ui/sonner';
 import { CARD_DEFS } from '@/definitions/cards';
 import { showBanner, triggerPopup, wait } from '@/game/animation';
-import { distance, inRange, isEnemy } from '@/game/helpers';
+import {
+    distance,
+    inRange,
+    isEnemy,
+    validateCardFrequencies,
+} from '@/game/helpers';
 import { initGame } from '@/game/init';
 import { gameReducer } from '@/gameReducer';
 import { CardKey, CardPick, FlashMap } from '@/types';
@@ -20,7 +25,7 @@ import { BattleLogPanel } from './components/GameLogPanel';
 import PopupLayer from './components/PopupLayer';
 import { CHARACTER_DEFS, CharacterKey } from './definitions/character';
 import { aiPickCardFrom, getAIDiscardCard } from './game/ai';
-import { getGunScore } from './game/combat';
+import { getGunScore, shouldPedroPickDiscard } from './game/combat';
 import { usePhaseResolver } from './game/engine';
 
 export default function App() {
@@ -356,6 +361,18 @@ export default function App() {
         [human.id],
     );
 
+    const handleCancelCharacterAbility = useCallback(
+        (charKey: CharacterKey) => {
+            dispatch({
+                type: 'CANCEL_CHARACTER_ABILITY',
+                characterKey: charKey,
+                sourceId: human.id,
+                targetId: null,
+            });
+        },
+        [human.id],
+    );
+
     const restartGame = useCallback(() => {
         dispatch({ type: 'SET_STATE', state: initGame() });
     }, [dispatch]);
@@ -374,6 +391,7 @@ export default function App() {
 
                 const isBlackJack = player.character === 'black_jack';
                 const isJesseJones = player.character === 'jesse_jones';
+                const isPedroRamirez = player.character === 'pedro_ramirez';
 
                 if (isBlackJack && Math.random() < 0.5) {
                     triggerPopup(player.id, 'ability', 'play', dispatch);
@@ -448,6 +466,24 @@ export default function App() {
                             return;
                         }
                     }
+                }
+
+                if (
+                    isPedroRamirez &&
+                    shouldPedroPickDiscard(G.discardPile, player)
+                ) {
+                    triggerPopup(player.id, 'ability', 'play', dispatch);
+
+                    await wait(1000);
+
+                    dispatch({
+                        type: 'ACTIVATE_CHARACTER_ABILITY',
+                        characterKey: 'pedro_ramirez',
+                        sourceId: player.id,
+                        targetId: null,
+                    });
+
+                    return;
                 }
 
                 dispatch({
@@ -1043,6 +1079,9 @@ export default function App() {
                             onActiveAbility={(charKey) =>
                                 handleActiveCharacterAbility(charKey)
                             }
+                            onCancelAbility={(charKey) =>
+                                handleCancelCharacterAbility(charKey)
+                            }
                         />
                     </div>
 
@@ -1056,6 +1095,7 @@ export default function App() {
                         <div className="rounded-2xl rounded-tl-none border border-amber-900/40 bg-[#1e110b]/60 p-6 shadow-2xl backdrop-blur-md transition-all duration-300 group-hover:border-amber-700/50 group-hover:bg-[#1e110b]/80">
                             <PlayerHand
                                 hand={human.hand}
+                                character={human.character}
                                 phase={G.phase}
                                 currentLP={human.hp}
                                 selectedCard={G.selectedCard}

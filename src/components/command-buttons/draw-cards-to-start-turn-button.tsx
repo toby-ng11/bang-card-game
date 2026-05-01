@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { useState } from 'react';
 
 interface DrawCardsToStartTurnButtonProps {
     onDraw: () => void;
@@ -7,11 +8,18 @@ interface DrawCardsToStartTurnButtonProps {
 export function DrawCardsToStartTurnButton({
     onDraw,
 }: DrawCardsToStartTurnButtonProps) {
+    const [isDisabled, setIsDisabled] = useState(false);
+
+    const handleClick = () => {
+        onDraw();
+        setIsDisabled(true);
+    };
     return (
         <div className="group relative flex items-center justify-center">
             <Button
                 size="lg"
-                onClick={onDraw}
+                onClick={handleClick}
+                disabled={isDisabled}
                 className="group relative h-16 flex-1 overflow-hidden rounded-xl border-b-4 border-amber-800 bg-linear-to-br from-yellow-500 to-amber-600 px-8 transition-all ease-in-out hover:scale-110 hover:from-yellow-400 hover:to-amber-500 active:translate-y-1 active:border-b-0"
             >
                 <div className="flex items-center gap-3">

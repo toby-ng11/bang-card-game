@@ -4,21 +4,21 @@ import { GameState } from '@/types';
 import { Dispatch, useEffect } from 'react';
 import { aiPickCardFrom } from './ai';
 import { showBanner, triggerPopup, wait } from './animation';
+import { getCardScore } from './combat';
 
 const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
     return useEffect(() => {
-        const playerWithEmptyHand = G.players.find(
-            (p) => p.alive && p.hand.length === 0,
+        const isSuzyWithEmptyHand = G.players.find(
+            (p) =>
+                p.alive &&
+                p.hand.length === 0 &&
+                p.character === 'suzy_lafayette',
         );
-        if (
-            G.phase === 'play' &&
-            playerWithEmptyHand &&
-            playerWithEmptyHand.character === 'suzy_lafayette'
-        ) {
+        if (G.phase === 'play' && isSuzyWithEmptyHand) {
             const aiDelay = setTimeout(async () => {
                 // Trigger your beautiful popup!
                 triggerPopup(
-                    playerWithEmptyHand.id,
+                    isSuzyWithEmptyHand.id,
                     'ability',
                     'play',
                     dispatch,
@@ -30,13 +30,13 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     type: 'TRIGGER_FLOAT',
                     cardKey: 'bang',
                     fromId: 'deck',
-                    toId: playerWithEmptyHand.id,
+                    toId: isSuzyWithEmptyHand.id,
                 });
 
                 dispatch({
                     type: 'RESOLVE_CHARACTER_ABILITY',
                     characterKey: 'suzy_lafayette',
-                    sourceId: playerWithEmptyHand.id,
+                    sourceId: isSuzyWithEmptyHand.id,
                     targetId: null,
                 });
             }, 1000);
@@ -414,9 +414,15 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         id: currentAction.id,
                     });
                     // AI Logic: Priority is 'bang', otherwise take the first available card
-                    const pick = availableCards.includes('bang')
-                        ? 'bang'
-                        : availableCards[0];
+                    // const pick = availableCards.includes('bang')
+                    //     ? 'bang'
+                    //     : availableCards[0];
+
+                    const pick = [...availableCards].sort(
+                        (a, b) =>
+                            getCardScore(b, currentGeneralStorePicker) -
+                            getCardScore(a, currentGeneralStorePicker),
+                    )[0];
 
                     dispatch({
                         type: 'RESOLVE_GENERAL_STORE_PICK',
@@ -606,6 +612,49 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                         payload: { cardPick: picked },
                     });
                 }
+                dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
+            }, 1000);
+
+            return () => clearTimeout(timeDelay);
+        }
+
+        if (
+            G.phase === 'pedro_ramirez' &&
+            reactor &&
+            G.discardPile.length > 0
+        ) {
+            const timeDelay = setTimeout(async () => {
+                dispatch({
+                    type: 'SET_ACTION_PROCESSING',
+                    id: currentAction.id,
+                });
+
+                dispatch({
+                    type: 'TRIGGER_FLOAT',
+                    cardKey: G.discardPile[G.discardPile.length - 1],
+                    fromId: 'discard',
+                    toId: reactor.id,
+                    count: 1,
+                });
+
+                await wait(300);
+
+                dispatch({
+                    type: 'TRIGGER_FLOAT',
+                    cardKey: 'bang',
+                    fromId: 'deck',
+                    toId: reactor.id,
+                    count: 1,
+                });
+
+                await wait(1000);
+
+                dispatch({
+                    type: 'RESOLVE_CHARACTER_ABILITY',
+                    characterKey: 'pedro_ramirez',
+                    sourceId: reactor.id,
+                    targetId: null,
+                });
                 dispatch({ type: 'RESOLVE_ACTION', id: currentAction.id });
             }, 1000);
 

@@ -42,6 +42,14 @@ const aiPickCardFrom = (
         return def?.weapon && c.source === 'inPlay';
     });
 
+    // if target has Volcanic, and player is Suzy, steal it for ability
+    if (
+        actionCardKey === 'panic' &&
+        weapon?.key === 'volcanic' &&
+        perspective.character === 'suzy_lafayette'
+    )
+        return weapon;
+
     // if target has barrel, discard it so BANG! lands reliably
     if (barrel && isEnemy(state, perspective.id, target.id)) return barrel;
     // if target has mustang and AI can't reach them, discard it

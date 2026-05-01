@@ -1,4 +1,5 @@
 import { CARD_DEFS } from '@/definitions/cards';
+import { CharacterKey } from '@/definitions/character';
 import { cn } from '@/lib/utils';
 import { CardKey, Phase } from '@/types';
 import { Crosshair } from 'lucide-react';
@@ -7,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface PlayerHandProps {
     hand: CardKey[];
+    character: CharacterKey;
     phase: Phase;
     currentLP: number;
     selectedCard: number | null;
@@ -20,6 +22,7 @@ interface PlayerHandProps {
 
 export default function PlayerHand({
     hand,
+    character,
     phase,
     currentLP,
     selectedCard,
@@ -92,11 +95,14 @@ export default function PlayerHand({
                                             bangUsed &&
                                             isHumanTurn &&
                                             !hasVolcanic &&
+                                            character !== 'willy_the_kid' &&
                                             !discardingToEndTurn &&
+                                            phase === 'play' &&
                                             'cursor-not-allowed opacity-60',
                                         cardKey === 'missed' &&
                                             isHumanTurn &&
                                             !discardingToEndTurn &&
+                                            phase === 'play' &&
                                             'cursor-not-allowed opacity-60',
                                         // Selection / Discard States
                                         isSel &&
@@ -114,6 +120,7 @@ export default function PlayerHand({
                                             : cardKey === 'bang' &&
                                                 bangUsed &&
                                                 !hasVolcanic &&
+                                                character !== 'willy_the_kid' &&
                                                 !discardingToEndTurn
                                               ? handleReturn
                                               : cardKey === 'missed' &&

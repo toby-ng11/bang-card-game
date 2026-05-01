@@ -97,6 +97,12 @@ type GameAction =
           sourceId: number;
           targetId: number | null;
       }
+    | {
+          type: 'CANCEL_CHARACTER_ABILITY';
+          characterKey: CharacterKey;
+          sourceId: number;
+          targetId: number | null;
+      }
     | { type: 'END_TURN'; playerId: number }
     | { type: 'CANCEL_END_TURN'; playerId: number };
 
@@ -1559,7 +1565,40 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     return state;
                 }
                 case 'pedro_ramirez': {
-                    return state;
+                    if (!currentAction || currentAction.type !== characterKey)
+                        return { ...newState };
+
+                    const topDiscard = newState.discardPile.pop();
+                    if (!topDiscard) return { ...newState };
+                    
+                    newState.players.map((p) =>
+                        p.id === sourceId ? p.hand.push(topDiscard) : p,
+                    );
+
+                    const updatedState = handleDrawEffect(
+                        newState,
+                        sourceId,
+                        1,
+                    );
+
+                    const updatedAction = removeReactorFromCurrentAction(
+                        currentAction,
+                        sourceId,
+                    );
+
+                    return {
+                        ...updatedState,
+                        pendingAction:
+                            updatedAction.reactorId.length > 0
+                                ? [updatedAction, ...otherActions]
+                                : otherActions,
+                        phase:
+                            updatedAction.reactorId.length > 0
+                                ? updatedAction.type
+                                : otherActions.length > 0
+                                  ? otherActions[0].type
+                                  : 'play',
+                    };
                 }
                 case 'rose_doolan': {
                     return state;
@@ -1649,6 +1688,60 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                             `${sourcePlayer.name} use ${character.name}'s ability! Discard 2 cards to regain 1 LP.`,
                             ...state.log,
                         ],
+                    };
+                }
+                case 'pedro_ramirez': {
+                    if (state.phase !== 'draw') return { ...state };
+
+                    const newAction: PlayerAction = {
+                        id: generateActionId(characterKey),
+                        isProcessing: false,
+                        type: characterKey,
+                        sourceId: sourceId,
+                        targetId: [],
+                        reactorId: [sourceId],
+                    };
+
+                    return {
+                        ...state,
+                        phase: characterKey,
+                        pendingAction: [newAction],
+                        log: [
+                            `${sourcePlayer.name} use ${character.name}'s ability! Draw the first card on top of the discard pile.`,
+                            ...state.log,
+                        ],
+                    };
+                }
+                default:
+                    return { ...state };
+            }
+        }
+
+        case 'CANCEL_CHARACTER_ABILITY': {
+            const { characterKey, sourceId } = action;
+            //const character = CHARACTER_DEFS[characterKey];
+            //const sourcePlayer = state.players[sourceId];
+            const [currentAction, ...otherActions] = state.pendingAction;
+
+            switch (characterKey) {
+                case 'sid_ketchum': {
+                    const updatedAction = removeReactorFromCurrentAction(
+                        currentAction,
+                        sourceId,
+                    );
+
+                    return {
+                        ...state,
+                        pendingAction:
+                            updatedAction.reactorId.length > 0
+                                ? [updatedAction, ...otherActions]
+                                : otherActions,
+                        phase:
+                            updatedAction.reactorId.length > 0
+                                ? updatedAction.type
+                                : otherActions.length > 0
+                                  ? otherActions[0].type
+                                  : 'play',
                     };
                 }
                 default:

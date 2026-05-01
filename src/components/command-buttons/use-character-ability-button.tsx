@@ -1,12 +1,15 @@
+import { Button } from '@/components/ui/button';
+import { CHARACTER_DEFS, CharacterKey } from '@/definitions/character';
 import { Sparkles } from 'lucide-react';
-import { Button } from '../ui/button';
 
-interface UseSidKetchumAbilityButtonProps {
+interface UseCharacterAbilityButtonProps {
+    character: CharacterKey;
     onActiveAbility: () => void;
 }
-export function UseSidKetchumAbilityButton({
+export function UseCharacterAbilityButton({
+    character,
     onActiveAbility,
-}: UseSidKetchumAbilityButtonProps) {
+}: UseCharacterAbilityButtonProps) {
     return (
         <div className="group relative flex items-center justify-center">
             <Button
@@ -18,7 +21,7 @@ export function UseSidKetchumAbilityButton({
                     <Sparkles className="size-6 transition-transform group-hover:scale-120" />
                     <div className="flex flex-col items-start">
                         <span className="text-xs font-bold uppercase opacity-80">
-                            SID KETCHUM
+                            {CHARACTER_DEFS[character].name.toUpperCase()}
                         </span>
                         <span className="text-lg leading-none font-black">
                             Use Ability

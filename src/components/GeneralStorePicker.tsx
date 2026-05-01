@@ -143,7 +143,7 @@ export default function GeneralStorePicker({
 
                         {/* Card pool — stable grid, cells never reflow */}
                         <div className="relative rounded-2xl border-4 border-dashed border-amber-900/30 bg-[#25160e] p-6">
-                            <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] justify-center gap-6">
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] justify-center gap-6">
                                 {originalCardsRef.current.map(
                                     ({ key, displayKey }, index) => {
                                         const isPicked =
@@ -194,7 +194,7 @@ export default function GeneralStorePicker({
                                                         >
                                                             <GameCard
                                                                 cardKey={key}
-                                                                size="lg"
+                                                                size="md"
                                                             />
 
                                                             {/* Hover overlay — human only */}
