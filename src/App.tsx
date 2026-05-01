@@ -9,21 +9,16 @@ import RoleBanner from '@/components/RoleBanner';
 import { Toaster } from '@/components/ui/sonner';
 import { CARD_DEFS } from '@/definitions/cards';
 import { showBanner, triggerPopup, wait } from '@/game/animation';
-import {
-    distance,
-    inRange,
-    isEnemy,
-    validateCardFrequencies,
-} from '@/game/helpers';
+import { distance, inRange, isEnemy } from '@/game/helpers';
 import { initGame } from '@/game/init';
 import { gameReducer } from '@/gameReducer';
 import { CardKey, CardPick, FlashMap } from '@/types';
 import { AnimatePresence } from 'motion/react';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
-import { FloatAnimation } from './components/FloatLayer';
+import { FloatLayer } from './components/FloatLayer';
 import { BattleLogPanel } from './components/GameLogPanel';
 import PopupLayer from './components/PopupLayer';
-import { CHARACTER_DEFS } from './definitions/character';
+import { CHARACTER_DEFS, CharacterKey } from './definitions/character';
 import { aiPickCardFrom, getAIDiscardCard } from './game/ai';
 import { getGunScore } from './game/combat';
 import { usePhaseResolver } from './game/engine';
@@ -344,6 +339,22 @@ export default function App() {
     const handleCancelEndTurn = useCallback(() => {
         dispatch({ type: 'CANCEL_END_TURN', playerId: human.id });
     }, [dispatch, human.id]);
+
+    const handleActiveCharacterAbility = useCallback(
+        async (charKey: CharacterKey) => {
+            triggerPopup(0, 'ability', 'play', dispatch);
+
+            await wait(1000);
+
+            dispatch({
+                type: 'ACTIVATE_CHARACTER_ABILITY',
+                characterKey: charKey,
+                sourceId: human.id,
+                targetId: null,
+            });
+        },
+        [human.id],
+    );
 
     const restartGame = useCallback(() => {
         dispatch({ type: 'SET_STATE', state: initGame() });
@@ -897,7 +908,7 @@ export default function App() {
         }
     }, [G, G.over, G.phase, G.players, G.turn, G.generalStoreCards]);
 
-    validateCardFrequencies(G);
+    //validateCardFrequencies(G);
 
     return (
         <div
@@ -909,15 +920,7 @@ export default function App() {
 
             <PopupLayer activePopups={G.activePopups} dispatch={dispatch} />
 
-            <AnimatePresence>
-                {G.floatingCard && (
-                    <FloatAnimation
-                        key={`${G.floatingCard.cardKey}-${G.floatingCard.fromId}-${G.floatingCard.toId}`}
-                        {...G.floatingCard}
-                        onComplete={() => dispatch({ type: 'CLEAR_FLOAT' })}
-                    />
-                )}
-            </AnimatePresence>
+            <FloatLayer floatingCard={G.floatingCard} dispatch={dispatch} />
 
             <header className="fixed top-0 right-0 left-0 z-30 flex items-center justify-between bg-linear-to-b from-black/60 to-transparent p-4">
                 <RoleBanner human={human} />
@@ -1037,6 +1040,9 @@ export default function App() {
                             }}
                             onEndTurn={handleEndTurn}
                             onCancelEndTurn={handleCancelEndTurn}
+                            onActiveAbility={(charKey) =>
+                                handleActiveCharacterAbility(charKey)
+                            }
                         />
                     </div>
 
@@ -1050,6 +1056,7 @@ export default function App() {
                         <div className="rounded-2xl rounded-tl-none border border-amber-900/40 bg-[#1e110b]/60 p-6 shadow-2xl backdrop-blur-md transition-all duration-300 group-hover:border-amber-700/50 group-hover:bg-[#1e110b]/80">
                             <PlayerHand
                                 hand={human.hand}
+                                phase={G.phase}
                                 currentLP={human.hp}
                                 selectedCard={G.selectedCard}
                                 discardingToEndTurn={G.discardingToEndTurn}

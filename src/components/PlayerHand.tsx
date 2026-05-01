@@ -1,12 +1,13 @@
 import { CARD_DEFS } from '@/definitions/cards';
 import { cn } from '@/lib/utils';
-import { CardKey } from '@/types';
+import { CardKey, Phase } from '@/types';
 import { Crosshair } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface PlayerHandProps {
     hand: CardKey[];
+    phase: Phase;
     currentLP: number;
     selectedCard: number | null;
     discardingToEndTurn: boolean;
@@ -19,6 +20,7 @@ interface PlayerHandProps {
 
 export default function PlayerHand({
     hand,
+    phase,
     currentLP,
     selectedCard,
     discardingToEndTurn,
@@ -52,6 +54,17 @@ export default function PlayerHand({
                             </span>
                         )
                     )}
+
+                    {phase === 'sid_ketchum' && (
+                        <motion.span
+                            initial={{ y: 10, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: -10, opacity: 0 }}
+                            className="inline-block rounded-full border border-yellow-500/50 bg-yellow-950/80 px-4 py-1 text-xs font-bold text-yellow-400 shadow-lg backdrop-blur-sm"
+                        >
+                            Discard 2 cards to use ability
+                        </motion.span>
+                    )}
                 </AnimatePresence>
             </div>
 
@@ -81,22 +94,33 @@ export default function PlayerHand({
                                             !hasVolcanic &&
                                             !discardingToEndTurn &&
                                             'cursor-not-allowed opacity-60',
+                                        cardKey === 'missed' &&
+                                            isHumanTurn &&
+                                            !discardingToEndTurn &&
+                                            'cursor-not-allowed opacity-60',
                                         // Selection / Discard States
                                         isSel &&
                                             'z-40 -translate-y-6 border-yellow-500 ring-4 shadow-yellow-500/50 ring-yellow-400',
-                                        discardingToEndTurn &&
+                                        (discardingToEndTurn ||
+                                            phase === 'sid_ketchum') &&
                                             'border-red-500 grayscale-[0.3] hover:grayscale-0',
                                         !isSel &&
                                             !discardingToEndTurn &&
                                             'hover:border-white',
                                     )}
                                     onClick={() =>
-                                        cardKey === 'bang' &&
-                                        bangUsed &&
-                                        !hasVolcanic &&
-                                        !discardingToEndTurn
-                                            ? handleReturn
-                                            : onCardClick(i)
+                                        isHumanTurnToReact
+                                            ? onCardClick(i)
+                                            : cardKey === 'bang' &&
+                                                bangUsed &&
+                                                !hasVolcanic &&
+                                                !discardingToEndTurn
+                                              ? handleReturn
+                                              : cardKey === 'missed' &&
+                                                  isHumanTurn &&
+                                                  !discardingToEndTurn
+                                                ? handleReturn
+                                                : onCardClick(i)
                                     }
                                 >
                                     {/* Card Content */}

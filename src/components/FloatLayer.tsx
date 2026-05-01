@@ -1,8 +1,9 @@
 import { CARD_DEFS } from '@/definitions/cards';
+import { GameAction } from '@/gameReducer';
 import { cn } from '@/lib/utils';
 import { CardKey } from '@/types';
-import { motion } from 'motion/react';
-import { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Dispatch } from 'react';
 
 interface FloatAnimationProps {
     cardKey: CardKey;
@@ -12,14 +13,39 @@ interface FloatAnimationProps {
     onComplete: () => void;
 }
 
-export function FloatAnimation({
+export function FloatLayer({
+    floatingCard,
+    dispatch,
+}: {
+    floatingCard: {
+        cardKey: CardKey;
+        fromId: number | 'deck' | 'discard';
+        toId: number | 'deck' | 'discard';
+        count?: number;
+    } | null;
+    dispatch: Dispatch<GameAction>;
+}) {
+    return (
+        <AnimatePresence>
+            {floatingCard && (
+                <FloatAnimation
+                    key={`${floatingCard.cardKey}-${floatingCard.fromId}-${floatingCard.toId}`}
+                    {...floatingCard}
+                    onComplete={() => dispatch({ type: 'CLEAR_FLOAT' })}
+                />
+            )}
+        </AnimatePresence>
+    );
+}
+
+function FloatAnimation({
     cardKey,
     fromId,
     toId,
     count = 1,
     onComplete,
 }: FloatAnimationProps) {
-    const [rects] = useState(() => {
+    const getRects = () => {
         const fromEl = document.querySelector(`[data-pid="${fromId}"]`);
         const toEl = document.querySelector(`[data-pid="${toId}"]`);
         if (!fromEl || !toEl) return null;
@@ -27,7 +53,9 @@ export function FloatAnimation({
             start: fromEl.getBoundingClientRect(),
             end: toEl.getBoundingClientRect(),
         };
-    });
+    };
+
+    const rects = getRects();
 
     if (!rects) {
         onComplete();

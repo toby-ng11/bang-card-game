@@ -102,6 +102,9 @@ export interface GameState {
     cardPickerResolve: ((picked: CardPick) => void) | null;
     cardPickerLabel: string;
 
+    // sid ketchum
+    SidKetchumCardsDiscarded: 0 | 1 | 2;
+
     // general store
     generalStoreCards: CardKey[];
     generalStorePicking: boolean;

@@ -101,8 +101,8 @@ type GameAction =
     | { type: 'CANCEL_END_TURN'; playerId: number };
 
 function gameReducer(state: GameState, action: GameAction): GameState {
-    console.log('REDUCER ACTION:', action);
-    console.log('PENDING ACTION:', state.pendingAction);
+    //console.log('REDUCER ACTION:', action);
+    //console.log('PENDING ACTION:', state.pendingAction);
     switch (action.type) {
         case 'SET_STATE':
             return action.state;
@@ -1594,21 +1594,20 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
 
         case 'ACTIVATE_CHARACTER_ABILITY': {
-            const newState = structuredClone(state);
+            //const newState = structuredClone(state);
             const { characterKey, sourceId, targetId } = action;
             const character = CHARACTER_DEFS[characterKey];
-            const sourcePlayer = newState.players[sourceId];
-            //const [currentAction, ...otherActions] = newState.pendingAction;
+            const sourcePlayer = state.players[sourceId];
+            //const [currentAction, ...otherActions] = state.pendingAction;
 
             switch (characterKey) {
                 case 'jesse_jones': {
-                    if (targetId === null || newState.phase !== 'draw')
+                    if (targetId === null || state.phase !== 'draw')
                         return { ...state };
 
-                    if (sourceId === 0 && !newState.targeting)
-                        return { ...state };
+                    if (sourceId === 0 && !state.targeting) return { ...state };
 
-                    const targetPlayer = newState.players[targetId];
+                    const targetPlayer = state.players[targetId];
                     const newAction: PlayerAction = {
                         id: generateActionId(characterKey),
                         isProcessing: false,
@@ -1619,7 +1618,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                     };
 
                     return {
-                        ...newState,
+                        ...state,
                         targeting: false,
                         phase: characterKey,
                         cardPickerPicking: true,
@@ -1629,7 +1628,26 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                         log: [
                             `${sourcePlayer.name} use ${character.name}'s ability! Steal a card from ${targetPlayer.name}'s hand.`,
 
-                            ...newState.log,
+                            ...state.log,
+                        ],
+                    };
+                }
+                case 'sid_ketchum': {
+                    const newAction: PlayerAction = {
+                        id: generateActionId(characterKey),
+                        isProcessing: false,
+                        type: characterKey,
+                        sourceId: sourceId,
+                        targetId: [],
+                        reactorId: [sourceId],
+                    };
+                    return {
+                        ...state,
+                        phase: 'sid_ketchum',
+                        pendingAction: [newAction, ...state.pendingAction],
+                        log: [
+                            `${sourcePlayer.name} use ${character.name}'s ability! Discard 2 cards to regain 1 LP.`,
+                            ...state.log,
                         ],
                     };
                 }
@@ -1702,11 +1720,22 @@ function handleElimination(
     );
 
     // 2. MOVE dead player's cards to discard pile
+    const VultureSamIdx = originalState.players.findIndex(
+        (p) => p.alive && p.character === 'vulture_sam',
+    );
+
     const cardsToDiscard = [...deadPlayer.hand, ...deadPlayer.inPlay];
-    originalState.discardPile = [
-        ...cardsToDiscard,
-        ...originalState.discardPile,
-    ];
+    if (VultureSamIdx >= 0) {
+        originalState.players[VultureSamIdx].hand = [
+            ...cardsToDiscard,
+            ...originalState.players[VultureSamIdx].hand,
+        ];
+    } else {
+        originalState.discardPile = [
+            ...cardsToDiscard,
+            ...originalState.discardPile,
+        ];
+    }
 
     // 3. BANG! BOUNTY RULES
     if (killer) {

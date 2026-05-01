@@ -15,7 +15,7 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
             playerWithEmptyHand &&
             playerWithEmptyHand.character === 'suzy_lafayette'
         ) {
-            const aiDelay = setTimeout(() => {
+            const aiDelay = setTimeout(async () => {
                 // Trigger your beautiful popup!
                 triggerPopup(
                     playerWithEmptyHand.id,
@@ -23,6 +23,15 @@ const usePhaseResolver = (G: GameState, dispatch: Dispatch<GameAction>) => {
                     'play',
                     dispatch,
                 );
+
+                await wait(1000);
+
+                dispatch({
+                    type: 'TRIGGER_FLOAT',
+                    cardKey: 'bang',
+                    fromId: 'deck',
+                    toId: playerWithEmptyHand.id,
+                });
 
                 dispatch({
                     type: 'RESOLVE_CHARACTER_ABILITY',

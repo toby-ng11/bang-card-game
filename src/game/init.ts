@@ -52,6 +52,7 @@ function initGame(): GameState {
     // for testing
     const players: Player[] = roles.map((role, i) => {
         const isHuman = i === 0;
+        //const characterKey = i === 0 ? 'sid_ketchum' : charPool.pop()!;
         const characterKey = charPool.pop()!;
         const charInfo = CHARACTER_DEFS[characterKey];
 
@@ -104,6 +105,7 @@ function initGame(): GameState {
         cardPickerLabel: '',
         activePopups: [],
         floatingCard: null,
+        SidKetchumCardsDiscarded: 0,
     };
 }
 

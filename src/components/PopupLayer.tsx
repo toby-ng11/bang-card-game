@@ -2,7 +2,7 @@ import { CARD_DEFS } from '@/definitions/cards';
 import { GameAction } from '@/gameReducer';
 import { CardKey } from '@/types';
 import { AnimatePresence, motion } from 'motion/react';
-import { Dispatch, useState } from 'react';
+import { Dispatch } from 'react';
 
 interface PopupInstanceProps {
     id: string;
@@ -47,9 +47,9 @@ function PopupInstance({
     dispatch,
 }: PopupInstanceProps) {
     // Find the player element to get coordinates
-    const [playerEl] = useState(() =>
-        document.querySelector(`[data-pid="${pid}"]`),
-    );
+    const getPlayerElement = () =>
+        document.querySelector(`[data-pid="${pid}"]`);
+    const playerEl = getPlayerElement();
     if (!playerEl) return null;
 
     const rect = playerEl.getBoundingClientRect();

@@ -1,10 +1,13 @@
 import { Button } from '@/components/ui/button';
+import { CharacterKey } from '@/definitions/character';
 import { CardKey, GameState, Player } from '@/types';
 import { HeartCrack, Swords, Zap } from 'lucide-react';
+import { CancelAiblityButton } from './command-buttons/cancel-ability-button';
 import { CancelDiscardButton } from './command-buttons/cancel-discard-button';
 import { DrawCardsToStartTurnButton } from './command-buttons/draw-cards-to-start-turn-button';
 import { EndTurnButton } from './command-buttons/end-turn-button';
 import { UseJesseJonesAbilityButton } from './command-buttons/use-jesse-jones-ability-button';
+import { UseSidKetchumAbilityButton } from './command-buttons/use-sid-ketchum-ability-button';
 
 interface ActionButtonsProps {
     G: GameState;
@@ -17,6 +20,8 @@ interface ActionButtonsProps {
     onCancelEndTurn: () => void;
     onDuelingDiscardBang: () => void;
     onDuelingTakeDamage: () => void;
+    onActiveAbility: (characterKey: CharacterKey) => void;
+    onCancelAbility: (characterKey: CharacterKey) => void;
 }
 
 export default function ActionButtons({
@@ -30,6 +35,8 @@ export default function ActionButtons({
     onCancelEndTurn,
     onDuelingDiscardBang,
     onDuelingTakeDamage,
+    onActiveAbility,
+    onCancelAbility,
 }: ActionButtonsProps) {
     const currentPlayer = G.players[G.turn];
     const isMyTurn = currentPlayer.isHuman;
@@ -46,6 +53,7 @@ export default function ActionButtons({
     return (
         <div className="flex w-full flex-col justify-center gap-2">
             {/* Draw phase */}
+
             {isMyTurn && G.phase === 'draw' && (
                 <>
                     {currentPlayer.character === 'jesse_jones' && (
@@ -56,9 +64,21 @@ export default function ActionButtons({
                     <DrawCardsToStartTurnButton onDraw={onDraw} />
                 </>
             )}
+            {G.phase === 'sid_ketchum' && G.SidKetchumCardsDiscarded === 0 && (
+                <CancelAiblityButton
+                    onCancelAbility={() => onCancelAbility(human.character)}
+                />
+            )}
             {/* Play phase */}
             {isMyTurn && G.phase === 'play' && !G.discardingToEndTurn && (
                 <>
+                    {human.character === 'sid_ketchum' && (
+                        <UseSidKetchumAbilityButton
+                            onActiveAbility={() =>
+                                onActiveAbility(human.character)
+                            }
+                        />
+                    )}
                     {G.selectedCard !== null &&
                         !G.targeting &&
                         (needsTarget ? (
